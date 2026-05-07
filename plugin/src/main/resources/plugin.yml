@@ -1,0 +1,12 @@
+name: ProtectedAreaPlugin
+version: '1.0.2-paper'
+main: me.marquinho.protectedAreaPlugin.ProtectedAreaPlugin
+api-version: '1.21'
+authors: [ Marquinho ]
+description: Protected Area Plugin
+website: https://crewved.com/
+
+permissions:
+  protectedarea.admin:
+    description: Permite gestionar áreas protegidas
+    default: op

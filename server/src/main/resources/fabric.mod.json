@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "protectedareaserver",
+  "version": "${version}",
+  "name": "ProtectedAreaServer",
+  "description": "Desarrollado por CrewVed",
+  "authors": [],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/protectedareaserver/icon.png",
+  "environment": "server",
+  "entrypoints": {
+    "main": [
+      "me.marquinho.protectedareaserver.Protectedareaserver"
+    ]
+  },
+  "mixins": [
+    "protectedareaserver.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": ">=${minecraft_version}"
+  }
+}

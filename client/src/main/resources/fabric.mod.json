@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "protectedareaclient",
+  "version": "${version}",
+  "name": "ProtectedAreaClient",
+  "description": "Protected Area Mod Client",
+  "authors": [],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/protectedareaclient/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "me.marquinho.protectedareaclient.client.ProtectedareaclientClient"
+    ],
+    "main": [
+      "me.marquinho.protectedareaclient.Protectedareaclient"
+    ]
+  },
+  "custom": {
+    "fabric-api:custom_payloads": {
+      "play": {
+        "client": [
+          "protectedarea:main"
+        ],
+        "server": [
+          "protectedarea:main"
+        ]
+      }
+    }
+  },
+  "mixins": [
+    "protectedareaclient.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric": "*",
+    "minecraft": ">=${minecraft_version}",
+    "java": ">=21"
+  }
+}

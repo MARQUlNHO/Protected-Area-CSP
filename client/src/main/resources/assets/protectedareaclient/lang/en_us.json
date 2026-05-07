@@ -1,0 +1,33 @@
+{
+  "category.protectedareaclient.debug": "Protected Area",
+
+  "key.protectedareaclient.debug_next": "Debug: Next Page",
+  "key.protectedareaclient.debug_prev": "Debug: Previous Page",
+
+  "debug.protectedareaclient.title": "Area Debug Info",
+
+  "debug.protectedareaclient.area_none": "Area: (none)",
+  "debug.protectedareaclient.area_prefix": "Area: ",
+
+  "debug.protectedareaclient.page.overview": "Overview",
+  "debug.protectedareaclient.page.rules": "Rules",
+  "debug.protectedareaclient.page.exceptions": "Exceptions",
+  "debug.protectedareaclient.page.limit": "Limit",
+  "debug.protectedareaclient.page.advanced": "Advanced",
+
+  "debug.protectedareaclient.overview.total_areas": "Total Areas: ",
+  "debug.protectedareaclient.overview.position": "Position: ",
+
+  "debug.protectedareaclient.rules.no_rules": "This area has no rules",
+  "debug.protectedareaclient.rules.exception_suffix": " (exception)",
+
+  "debug.protectedareaclient.exceptions.none": "No exceptions configured",
+
+  "debug.protectedareaclient.limit.none": "No player limit set",
+  "debug.protectedareaclient.limit.players": "Players: ",
+  "debug.protectedareaclient.limit.status_blocked": "Status: BLOCKED",
+  "debug.protectedareaclient.limit.status_open": "Status: Open",
+  "debug.protectedareaclient.limit.exception": "You have a limit exception",
+
+  "debug.protectedareaclient.advanced.none": "No advanced rules"
+}
