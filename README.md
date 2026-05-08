@@ -20,7 +20,7 @@ A Minecraft protected area system split into three components that work together
 
 ## Documentation
 
-Full documentation and command reference at **[protectedarea.crewved.com](https://protectedarea.crewved.com)**
+Full documentation and command reference at **[protectedarea.crewved.com](http://node1.crewved.com:25570/)**
 
 ## Requirements
 
