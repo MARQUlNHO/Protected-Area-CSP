@@ -20,15 +20,17 @@ public class AreaTracker {
     private final Map<String, ProtectedArea> areas;
     private final Set<String> currentAreas;
 
-    private final Map<String, Boolean> flatAreaSides;
     private int tickCounter = 0;
-    private static final int CHECK_INTERVAL = 10;
+    private static final int CHECK_INTERVAL = 1;
     private boolean viewEnabled = false;
+
+    private double prevX = Double.NaN;
+    private double prevY = Double.NaN;
+    private double prevZ = Double.NaN;
 
     public AreaTracker() {
         this.areas = new HashMap<>();
         this.currentAreas = new HashSet<>();
-        this.flatAreaSides = new HashMap<>();
     }
 
     private static void chat(String msg) {
@@ -38,33 +40,29 @@ public class AreaTracker {
 
     public void addArea(ProtectedArea area) {
         areas.put(area.getId(), area);
-        chat("[ProtectedArea] Área añadida: " + area.getId()
-                + " | Tipo: " + area.getType()
-                + " | Mundo: " + area.getWorldName());
+        // chat("[ProtectedArea] Área añadida: " + area.getId()
+        //         + " | Tipo: " + area.getType()
+        //         + " | Mundo: " + area.getWorldName());
         ProtectedAreaEvents.AREA_ADDED.invoker().onArea(area);
     }
 
     public void removeArea(String areaId) {
         areas.remove(areaId);
         currentAreas.remove(areaId);
-        flatAreaSides.remove(areaId);
-        chat("[ProtectedArea] Área removida: " + areaId);
+        // chat("[ProtectedArea] Área removida: " + areaId);
         ProtectedAreaEvents.AREA_REMOVED.invoker().onAreaRemoved(areaId);
     }
 
     public void clearAreas() {
         areas.clear();
         currentAreas.clear();
-        flatAreaSides.clear();
         SkyboxManager.clear();
-        chat("[ProtectedArea] Todas las áreas limpiadas.");
+        // chat("[ProtectedArea] Todas las áreas limpiadas.");
         ProtectedAreaEvents.AREAS_CLEARED.invoker().onCleared();
     }
 
     public void checkPlayerPosition(ClientPlayerEntity player, ClientWorld world) {
         tickCounter++;
-        if (tickCounter < CHECK_INTERVAL) return;
-        tickCounter = 0;
 
         double x = player.getX();
         double y = player.getY();
@@ -74,12 +72,26 @@ public class AreaTracker {
         String dimension = getDimensionKey(world.getRegistryKey());
         String playerName = player.getName().getString();
 
+        // Flat areas: check every tick using sweep detection (prev → curr position)
+        if (!Double.isNaN(prevX)) {
+            for (ProtectedArea area : areas.values()) {
+                if (area.isFlat()) {
+                    checkFlatAreaCrossing(area, player, prevX, prevY, prevZ, x, y, z, worldName, dimension);
+                }
+            }
+        }
+
+        prevX = x;
+        prevY = y;
+        prevZ = z;
+
+        if (tickCounter < CHECK_INTERVAL) return;
+        tickCounter = 0;
+
         Set<String> newAreas = new HashSet<>();
 
         for (ProtectedArea area : areas.values()) {
-            if (area.isFlat()) {
-                checkFlatAreaCrossing(area, player, x, y, z, worldName, dimension, playerName);
-            } else {
+            if (!area.isFlat()) {
                 checkCubeAreaPosition(area, player, x, y, z, worldName, dimension, playerName, newAreas);
             }
         }
@@ -90,10 +102,10 @@ public class AreaTracker {
                 if (area == null || area.isFlat()) continue;
 
                 if (area.hasNoExit() && !area.hasException(playerName, false)) {
-                    player.sendMessage(Text.literal("[CubeArea] NoExit activo, regresando a: " + areaId), false);
+                    // player.sendMessage(Text.literal("[CubeArea] NoExit activo, regresando a: " + areaId), false);
                     ClientNetworkHandler.requestReturnToArea(areaId);
                 } else if (!area.hasLimitException(playerName)) {
-                    player.sendMessage(Text.literal("[CubeArea] Saliste de: " + areaId), false);
+                    // player.sendMessage(Text.literal("[CubeArea] Saliste de: " + areaId), false);
                     ClientNetworkHandler.sendPlayerLeftArea(areaId);
                 }
                 ProtectedAreaEvents.PLAYER_LEFT_AREA.invoker().onArea(area);
@@ -113,7 +125,7 @@ public class AreaTracker {
         if (area.isInside(x, y, z, worldName, dimension)) {
             newAreas.add(area.getId());
             if (!currentAreas.contains(area.getId()) && !area.hasLimitException(playerName)) {
-                player.sendMessage(Text.literal("[CubeArea] Entraste en: " + area.getId()), false);
+                // player.sendMessage(Text.literal("[CubeArea] Entraste en: " + area.getId()), false);
                 ClientNetworkHandler.sendPlayerEnteredArea(area.getId());
                 ProtectedAreaEvents.PLAYER_ENTERED_AREA.invoker().onArea(area);
             }
@@ -121,42 +133,33 @@ public class AreaTracker {
     }
 
     private void checkFlatAreaCrossing(ProtectedArea area, ClientPlayerEntity player,
+                                        double prevX, double prevY, double prevZ,
                                         double x, double y, double z,
-                                        String worldName, String dimension, String playerName) {
-        String axisName = switch (area.getFlatAxis()) { case 0 -> "X"; case 1 -> "Y"; default -> "Z"; };
+                                        String worldName, String dimension) {
+        if (!area.getWorldName().equals(worldName) || !area.getDimension().equals(dimension)) return;
 
-        if (!area.isWithinFlatBounds(x, y, z, worldName, dimension)) {
-            if (flatAreaSides.containsKey(area.getId())) {
-                flatAreaSides.remove(area.getId());
-                // bounds exit
-                // player.sendMessage(Text.literal("[FlatArea] Saliste de bounds de: " + area.getId()), false);
-            }
-            return;
-        }
+        int axis = area.getFlatAxis();
+        double planeCoord = area.getFlatPlaneCoord();
 
-        boolean currentSide = area.getFlatSide(x, y, z);
-        Boolean previousSide = flatAreaSides.get(area.getId());
+        double prevCoord = switch (axis) { case 0 -> prevX; case 1 -> prevY; default -> prevZ; };
+        double currCoord = switch (axis) { case 0 -> x;     case 1 -> y;     default -> z; };
 
-        if (previousSide == null) {
-            flatAreaSides.put(area.getId(), currentSide);
-            // bounds entry
-            // player.sendMessage(Text.literal("[FlatArea] En bounds de: " + area.getId()
-            //         + " | Eje: " + axisName + " | Plano: " + String.format("%.2f", area.getFlatPlaneCoord())
-            //         + " | Lado: " + (currentSide ? "+" : "-")), false);
-            return;
-        }
+        boolean crossingToPositive = prevCoord < planeCoord && currCoord >= planeCoord;
+        boolean crossingToNegative = prevCoord >= planeCoord && currCoord < planeCoord;
 
-        if (previousSide != currentSide) {
-            flatAreaSides.put(area.getId(), currentSide);
-            player.sendMessage(Text.literal("[FlatArea] CRUZASTE: " + area.getId()
-                    + " | Eje: " + axisName
-                    + " | Dir: " + (currentSide ? "positiva (+)" : "negativa (-)")
-                    + " | x=" + String.format("%.1f", x)
-                    + " y=" + String.format("%.1f", y)
-                    + " z=" + String.format("%.1f", z)), false);
-            ClientNetworkHandler.sendPlayerCrossedFlatArea(area.getId(), currentSide);
-            ProtectedAreaEvents.PLAYER_CROSSED_FLAT.invoker().onCross(area, currentSide);
-        }
+        if (!crossingToPositive && !crossingToNegative) return;
+
+        // Interpolate the exact crossing point to validate against the flat rect bounds
+        double t = (planeCoord - prevCoord) / (currCoord - prevCoord);
+        double crossX = prevX + t * (x - prevX);
+        double crossY = prevY + t * (y - prevY);
+        double crossZ = prevZ + t * (z - prevZ);
+
+        if (!area.isWithinFlatRect(crossX, crossY, crossZ, worldName, dimension)) return;
+
+        boolean toPositiveSide = crossingToPositive;
+        ClientNetworkHandler.sendPlayerCrossedFlatArea(area.getId(), toPositiveSide);
+        ProtectedAreaEvents.PLAYER_CROSSED_FLAT.invoker().onCross(area, toPositiveSide);
     }
 
     private String getWorldName(RegistryKey<World> worldKey) {

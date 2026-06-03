@@ -64,6 +64,7 @@ public class FlatLimitCommand {
         else area.setPassNegative(value);
 
         plugin.getAreaManager().saveAreaManually(area);
+        plugin.getAreaManager().broadcastUpdateArea(area);
 
         String side = isPositive ? "positivo (+)" : "negativo (-)";
         String status = value ? "§aABIERTO" : "§cBLOQUEADO";
