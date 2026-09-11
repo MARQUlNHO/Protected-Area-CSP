@@ -19,7 +19,7 @@ public class ExecuteCommand {
 
     public static LiteralArgumentBuilder<CommandSourceStack> buildCommand(ProtectedAreaPlugin plugin) {
         return Commands.literal("execute")
-                .then(Commands.argument("area_id", StringArgumentType.word())
+                .then(Commands.argument("area_id", StringArgumentType.string())
                         .suggests(suggestAreaIds(plugin))
                         .then(Commands.argument("command", StringArgumentType.greedyString())
                                 .executes(context -> executeCommand(context, plugin))
@@ -32,16 +32,35 @@ public class ExecuteCommand {
         String areaId = StringArgumentType.getString(context, "area_id");
         String command = StringArgumentType.getString(context, "command");
 
+        if (areaId.endsWith("/")) {
+            List<ProtectedArea> list = plugin.getAreaManager().getAreasByFolder(areaId);
+            if (list.isEmpty()) { sender.sendMessage("§cNo areas in folder: " + areaId); return 0; }
+            int total = 0, success = 0;
+            for (ProtectedArea a : list) {
+                for (Player player : getPlayersInArea(plugin, a)) {
+                    total++;
+                    try {
+                        Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), command.replace("{player}", player.getName()));
+                        success++;
+                    } catch (Exception e) {
+                        sender.sendMessage("§cError for §6" + player.getName() + "§c: " + e.getMessage());
+                    }
+                }
+            }
+            sender.sendMessage("§aCommand executed on §6" + success + "§a/§6" + total + " §aplayer(s) in folder §6" + areaId);
+            return 1;
+        }
+
         ProtectedArea area = plugin.getAreaManager().getAreas().get(areaId);
         if (area == null) {
-            sender.sendMessage("§cNo existe un área con el ID: " + areaId);
+            sender.sendMessage("§cNo area exists with ID: " + areaId);
             return 0;
         }
 
         List<Player> playersInArea = getPlayersInArea(plugin, area);
 
         if (playersInArea.isEmpty()) {
-            sender.sendMessage("§eNo hay jugadores dentro del área §6" + areaId);
+            sender.sendMessage("§eNo players inside area §6" + areaId);
             return 0;
         }
 
@@ -52,29 +71,25 @@ public class ExecuteCommand {
                 Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), finalCommand);
                 successCount++;
             } catch (Exception e) {
-                sender.sendMessage("§cError al ejecutar comando para §6" + player.getName() + "§c: " + e.getMessage());
+                sender.sendMessage("§cError executing command for §6" + player.getName() + "§c: " + e.getMessage());
             }
         }
 
-        sender.sendMessage("§aComando ejecutado en §6" + successCount + "§a/§6" + playersInArea.size() + " §ajugador(es) del área §6" + areaId);
+        sender.sendMessage("§aCommand executed on §6" + successCount + "§a/§6" + playersInArea.size() + " §aplayer(s) in area §6" + areaId);
         return 1;
     }
 
     private static List<Player> getPlayersInArea(ProtectedAreaPlugin plugin, ProtectedArea area) {
-        List<Player> playersInArea = new ArrayList<>();
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            ProtectedArea playerArea = plugin.getAreaManager().getAreaAt(player.getLocation());
-            if (playerArea != null && playerArea.getId().equals(area.getId())) playersInArea.add(player);
-        }
-        return playersInArea;
+        return plugin.getAreaManager().getPlayersInsideArea(area.getId());
     }
 
     private static SuggestionProvider<CommandSourceStack> suggestAreaIds(ProtectedAreaPlugin plugin) {
         return (context, builder) -> {
             plugin.getAreaManager().getAreas().entrySet().stream()
-                    .filter(e -> !e.getValue().isFlat())
+                    .filter(e -> e.getValue().isCube())
+                    .filter(e -> !plugin.getConfigManager().isIgnoredInCommand(e.getValue()))
                     .map(java.util.Map.Entry::getKey)
-                    .forEach(builder::suggest);
+                    .forEach(id -> builder.suggest(id.contains("/") ? "\"" + id + "\"" : id));
             return builder.buildFuture();
         };
     }

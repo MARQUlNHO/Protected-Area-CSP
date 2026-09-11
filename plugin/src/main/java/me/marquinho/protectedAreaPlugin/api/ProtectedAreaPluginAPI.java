@@ -9,8 +9,10 @@ import me.marquinho.protectedAreaPlugin.models.AreaRule;
 import me.marquinho.protectedAreaPlugin.models.ProtectedArea;
 import org.bukkit.entity.Player;
 
+import java.io.File;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 // Entry point for interacting with ProtectedAreaPlugin from other plugins.
@@ -50,11 +52,10 @@ public final class ProtectedAreaPluginAPI {
 
     // All areas whose bounds contain the given location.
     public Collection<ProtectedArea> getAreasAt(org.bukkit.Location location) {
-        String worldName = location.getWorld() != null ? location.getWorld().getName() : "";
-        String dimension = worldToDimension(worldName);
+        String dimension = location.getWorld() != null ? location.getWorld().getKey().toString() : "";
         double x = location.getX(), y = location.getY(), z = location.getZ();
         return plugin().getAreaManager().getAreas().values().stream()
-                .filter(area -> area.isInside(x, y, z, worldName, dimension))
+                .filter(area -> area.isInside(x, y, z, dimension))
                 .toList();
     }
 
@@ -68,6 +69,11 @@ public final class ProtectedAreaPluginAPI {
     // Number of players currently inside the area.
     public int getPlayersInArea(String areaId) {
         return plugin().getAreaManager().getPlayersInArea(areaId);
+    }
+
+    // Players currently inside the area.
+    public List<Player> getPlayersListInArea(String areaId) {
+        return plugin().getAreaManager().getPlayersInsideArea(areaId);
     }
 
     // Whether the area has the given basic rule.
@@ -86,7 +92,7 @@ public final class ProtectedAreaPluginAPI {
 
     // Advanced rules (block/entity rules) for the given area.
     public AdvancedAreaRules getAdvancedRules(String areaId) {
-        return plugin().getAdvancedRulesManager().getRules(areaId);
+        return plugin().getAdvancedRulesManager().getRules(storageKey(areaId));
     }
 
     // ----------
@@ -94,9 +100,9 @@ public final class ProtectedAreaPluginAPI {
     // ----------
 
     // Create a cube area. Returns false if the ID already exists.
-    public boolean createArea(String id, String worldName, String dimension,
+    public boolean createArea(String id, String dimension,
                               int x1, int y1, int z1, int x2, int y2, int z2) {
-        boolean created = plugin().getAreaManager().createArea(id, worldName, dimension, x1, y1, z1, x2, y2, z2);
+        boolean created = plugin().getAreaManager().createArea(id, dimension, x1, y1, z1, x2, y2, z2);
         if (created) {
             ProtectedArea area = plugin().getAreaManager().getAreas().get(id);
             plugin().getAreaManager().broadcastNewArea(area);
@@ -106,15 +112,31 @@ public final class ProtectedAreaPluginAPI {
     }
 
     // Create a flat area. Returns false if the ID already exists.
-    public boolean createFlatArea(String id, String worldName, String dimension,
+    public boolean createFlatArea(String id, String dimension,
                                   int x1, int y1, int z1, int x2, int y2, int z2, int flatPosition) {
-        boolean created = plugin().getAreaManager().createArea(id, worldName, dimension, x1, y1, z1, x2, y2, z2, "flat", flatPosition);
+        boolean created = plugin().getAreaManager().createArea(id, dimension, x1, y1, z1, x2, y2, z2, "flat", flatPosition);
         if (created) {
             ProtectedArea area = plugin().getAreaManager().getAreas().get(id);
             plugin().getAreaManager().broadcastNewArea(area);
             plugin().getServer().getPluginManager().callEvent(new AreaCreatedEvent(area));
         }
         return created;
+    }
+
+    // Deprecated: kept for source/binary compatibility with plugins built against the old API.
+    // worldName is ignored — the dimension key alone identifies the area now.
+    @Deprecated
+    public boolean createArea(String id, String worldName, String dimension,
+                              int x1, int y1, int z1, int x2, int y2, int z2) {
+        return createArea(id, dimension, x1, y1, z1, x2, y2, z2);
+    }
+
+    // Deprecated: kept for source/binary compatibility with plugins built against the old API.
+    // worldName is ignored — the dimension key alone identifies the area now.
+    @Deprecated
+    public boolean createFlatArea(String id, String worldName, String dimension,
+                                  int x1, int y1, int z1, int x2, int y2, int z2, int flatPosition) {
+        return createFlatArea(id, dimension, x1, y1, z1, x2, y2, z2, flatPosition);
     }
 
     // Remove an area. Returns false if the ID does not exist.
@@ -125,6 +147,40 @@ public final class ProtectedAreaPluginAPI {
             plugin().getServer().getPluginManager().callEvent(new AreaRemovedEvent(id));
         }
         return removed;
+    }
+
+    // Remove all areas inside a folder prefix. Returns the number of areas removed.
+    // Use ".flat/<folder>/" to target flat areas, "<folder>/" for cube areas.
+    // The physical folder is deleted after all areas are removed.
+    public int removeAreasByFolder(String folderPrefix) {
+        final boolean isFlat = folderPrefix.startsWith(".flat/");
+        final String idPrefix = isFlat ? folderPrefix.substring(".flat/".length()) : folderPrefix;
+        final String normalizedPrefix = idPrefix.endsWith("/") ? idPrefix : idPrefix + "/";
+
+        List<String> ids = plugin().getAreaManager().getAreas().entrySet().stream()
+                .filter(e -> isFlat ? e.getValue().isFlat() : e.getValue().isCube())
+                .map(java.util.Map.Entry::getKey)
+                .filter(id -> id.startsWith(normalizedPrefix))
+                .toList();
+        int count = 0;
+        for (String id : ids) {
+            if (removeArea(id)) count++;
+        }
+
+        File areasRoot = new File(plugin().getDataFolder(), "Areas");
+        File folder = isFlat
+                ? new File(areasRoot, ".flat" + File.separator + normalizedPrefix.replace("/", File.separator))
+                : new File(areasRoot, normalizedPrefix.replace("/", File.separator));
+        deleteFolder(folder);
+
+        return count;
+    }
+
+    private void deleteFolder(File folder) {
+        if (!folder.exists() || !folder.isDirectory()) return;
+        File[] files = folder.listFiles();
+        if (files != null) for (File f : files) deleteFolder(f);
+        folder.delete();
     }
 
     // ------------------------
@@ -231,38 +287,36 @@ public final class ProtectedAreaPluginAPI {
 
     // Add a block advanced rule to an area.
     public boolean addBlockRule(String areaId, AdvancedRuleType ruleType, String blockId) {
-        return plugin().getAdvancedRulesManager().addBlockRule(areaId, ruleType, blockId);
+        return plugin().getAdvancedRulesManager().addBlockRule(storageKey(areaId), ruleType, blockId);
     }
 
     // Remove a block advanced rule from an area.
     public boolean removeBlockRule(String areaId, AdvancedRuleType ruleType, String blockId) {
-        return plugin().getAdvancedRulesManager().removeBlockRule(areaId, ruleType, blockId);
+        return plugin().getAdvancedRulesManager().removeBlockRule(storageKey(areaId), ruleType, blockId);
     }
 
     // Add an entity advanced rule to an area.
     public boolean addEntityRule(String areaId, AdvancedRuleType ruleType, String entityId) {
-        return plugin().getAdvancedRulesManager().addEntityRule(areaId, ruleType, entityId);
+        return plugin().getAdvancedRulesManager().addEntityRule(storageKey(areaId), ruleType, entityId);
     }
 
     // Remove an entity advanced rule from an area.
     public boolean removeEntityRule(String areaId, AdvancedRuleType ruleType, String entityId) {
-        return plugin().getAdvancedRulesManager().removeEntityRule(areaId, ruleType, entityId);
+        return plugin().getAdvancedRulesManager().removeEntityRule(storageKey(areaId), ruleType, entityId);
     }
 
     // --------
     // Internal
     // --------
 
+    private String storageKey(String areaId) {
+        ProtectedArea area = plugin().getAreaManager().getAreas().get(areaId);
+        return area != null ? area.getStorageKey() : areaId;
+    }
+
     private void broadcastUpdate(String areaId) {
         ProtectedArea area = plugin().getAreaManager().getAreas().get(areaId);
         if (area != null) plugin().getAreaManager().broadcastUpdateArea(area);
     }
 
-    private String worldToDimension(String worldName) {
-        return switch (worldName) {
-            case "world_nether" -> "minecraft:the_nether";
-            case "world_the_end" -> "minecraft:the_end";
-            default -> "minecraft:overworld";
-        };
-    }
 }

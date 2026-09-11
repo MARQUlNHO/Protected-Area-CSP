@@ -10,17 +10,20 @@ import me.marquinho.protectedAreaPlugin.ProtectedAreaPlugin;
 import me.marquinho.protectedAreaPlugin.models.ProtectedArea;
 import org.bukkit.command.CommandSender;
 
+import java.util.List;
+
 public class FlatLimitCommand {
 
     public static LiteralArgumentBuilder<CommandSourceStack> buildCommand(ProtectedAreaPlugin plugin) {
         return Commands.literal("limit")
                 .then(Commands.literal("pass")
-                        .then(Commands.argument("area_id", StringArgumentType.word())
+                        .then(Commands.argument("area_id", StringArgumentType.string())
                                 .suggests((ctx, builder) -> {
                                     plugin.getAreaManager().getAreas().entrySet().stream()
                                             .filter(e -> e.getValue().isFlat())
+                                            .filter(e -> !plugin.getConfigManager().isIgnoredInCommand(e.getValue()))
                                             .map(java.util.Map.Entry::getKey)
-                                            .forEach(builder::suggest);
+                                            .forEach(id -> builder.suggest(id.contains("/") ? "\"" + id + "\"" : id));
                                     return builder.buildFuture();
                                 })
                                 .then(Commands.literal("negative")
@@ -36,12 +39,13 @@ public class FlatLimitCommand {
                         )
                 )
                 .then(Commands.literal("info")
-                        .then(Commands.argument("area_id", StringArgumentType.word())
+                        .then(Commands.argument("area_id", StringArgumentType.string())
                                 .suggests((ctx, builder) -> {
                                     plugin.getAreaManager().getAreas().entrySet().stream()
                                             .filter(e -> e.getValue().isFlat())
+                                            .filter(e -> !plugin.getConfigManager().isIgnoredInCommand(e.getValue()))
                                             .map(java.util.Map.Entry::getKey)
-                                            .forEach(builder::suggest);
+                                            .forEach(id -> builder.suggest(id.contains("/") ? "\"" + id + "\"" : id));
                                     return builder.buildFuture();
                                 })
                                 .executes(ctx -> executeInfo(ctx, plugin))
@@ -53,10 +57,26 @@ public class FlatLimitCommand {
         CommandSender sender = ctx.getSource().getSender();
         String areaId = StringArgumentType.getString(ctx, "area_id");
         boolean value = BoolArgumentType.getBool(ctx, "value");
+        String side = isPositive ? "positive (+)" : "negative (-)";
+        String status = value ? "§aOPEN" : "§cBLOCKED";
+
+        if (areaId.endsWith("/")) {
+            List<ProtectedArea> list = plugin.getAreaManager().getAreasByFolder(areaId);
+            List<ProtectedArea> flatList = list.stream().filter(ProtectedArea::isFlat).toList();
+            if (flatList.isEmpty()) { sender.sendMessage("§cNo flat areas in folder: " + areaId); return 0; }
+            for (ProtectedArea a : flatList) {
+                if (isPositive) a.setPassPositive(value);
+                else a.setPassNegative(value);
+                plugin.getAreaManager().saveAreaManually(a);
+                plugin.getAreaManager().broadcastUpdateArea(a);
+            }
+            sender.sendMessage("§aSide " + side + ": " + status + " §aapplied to §6" + flatList.size() + " §aflat area(s) in §6" + areaId);
+            return 1;
+        }
 
         ProtectedArea area = plugin.getAreaManager().getAreas().get(areaId);
         if (area == null || !area.isFlat()) {
-            sender.sendMessage("§cNo existe un área flat con el ID: " + areaId);
+            sender.sendMessage("§cNo flat area exists with ID: " + areaId);
             return 0;
         }
 
@@ -66,10 +86,8 @@ public class FlatLimitCommand {
         plugin.getAreaManager().saveAreaManually(area);
         plugin.getAreaManager().broadcastUpdateArea(area);
 
-        String side = isPositive ? "positivo (+)" : "negativo (-)";
-        String status = value ? "§aABIERTO" : "§cBLOQUEADO";
-        sender.sendMessage("§eÁrea: §6" + areaId);
-        sender.sendMessage("§eLado " + side + ": " + status);
+        sender.sendMessage("§eArea: §6" + areaId);
+        sender.sendMessage("§eSide " + side + ": " + status);
         return 1;
     }
 
@@ -79,14 +97,14 @@ public class FlatLimitCommand {
 
         ProtectedArea area = plugin.getAreaManager().getAreas().get(areaId);
         if (area == null || !area.isFlat()) {
-            sender.sendMessage("§cNo existe un área flat con el ID: " + areaId);
+            sender.sendMessage("§cNo flat area exists with ID: " + areaId);
             return 0;
         }
 
-        String negStatus = area.isPassNegative() ? "§atrue (abierto)" : "§cfalse (bloqueado)";
-        String posStatus = area.isPassPositive() ? "§atrue (abierto)" : "§cfalse (bloqueado)";
+        String negStatus = area.isPassNegative() ? "§atrue (open)" : "§cfalse (blocked)";
+        String posStatus = area.isPassPositive() ? "§atrue (open)" : "§cfalse (blocked)";
 
-        sender.sendMessage("§eÁrea flat: §6" + areaId);
+        sender.sendMessage("§eFlat area: §6" + areaId);
         sender.sendMessage("§epass.negative: " + negStatus);
         sender.sendMessage("§epass.positive: " + posStatus);
         return 1;

@@ -4,7 +4,6 @@ import me.marquinho.protectedAreaPlugin.ProtectedAreaPlugin;
 import me.marquinho.protectedAreaPlugin.api.events.AreaAdvancedRuleBlockedEvent;
 import me.marquinho.protectedAreaPlugin.api.events.AreaRuleBlockedEvent;
 import me.marquinho.protectedAreaPlugin.managers.NotificationManager;
-import me.marquinho.protectedAreaPlugin.models.AdvancedAreaRules;
 import me.marquinho.protectedAreaPlugin.models.AdvancedRuleType;
 import me.marquinho.protectedAreaPlugin.models.AreaRule;
 import me.marquinho.protectedAreaPlugin.models.ProtectedArea;
@@ -16,6 +15,7 @@ import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.*;
@@ -47,12 +47,11 @@ public class AreaProtectionListener implements Listener {
 
         if (area == null) return;
 
-        if (area.hasException(player.getName(), "no_break")) {
+        if (plugin.getAreaManager().hasInheritedException(event.getBlock().getLocation(), player.getName(), "no_break")) {
             return;
         }
 
         String blockId = event.getBlock().getType().getKey().toString();
-        AdvancedAreaRules advancedRules = plugin.getAdvancedRulesManager().getRules(area.getId());
 
         Map<String, String> placeholders = NotificationManager.createFullPlaceholders(
                 blockId,
@@ -69,7 +68,7 @@ public class AreaProtectionListener implements Listener {
         }
 
         if (plugin.getAreaManager().hasInheritedRule(event.getBlock().getLocation(), AreaRule.NO_BREAK)) {
-            if (advancedRules.hasBlock(AdvancedRuleType.YES_BREAK, blockId)) {
+            if (plugin.getAreaManager().hasInheritedAdvancedBlock(event.getBlock().getLocation(), AdvancedRuleType.YES_BREAK, blockId)) {
                 return;
             }
 
@@ -86,12 +85,11 @@ public class AreaProtectionListener implements Listener {
 
         if (area == null) return;
 
-        if (area.hasException(player.getName(), "no_place")) {
+        if (plugin.getAreaManager().hasInheritedException(event.getBlock().getLocation(), player.getName(), "no_place")) {
             return;
         }
 
         String blockId = event.getBlock().getType().getKey().toString();
-        AdvancedAreaRules advancedRules = plugin.getAdvancedRulesManager().getRules(area.getId());
 
         Map<String, String> placeholders = NotificationManager.createFullPlaceholders(
                 blockId,
@@ -108,7 +106,7 @@ public class AreaProtectionListener implements Listener {
         }
 
         if (plugin.getAreaManager().hasInheritedRule(event.getBlock().getLocation(), AreaRule.NO_PLACE)) {
-            if (advancedRules.hasBlock(AdvancedRuleType.YES_PLACE, blockId)) {
+            if (plugin.getAreaManager().hasInheritedAdvancedBlock(event.getBlock().getLocation(), AdvancedRuleType.YES_PLACE, blockId)) {
                 return;
             }
 
@@ -125,7 +123,7 @@ public class AreaProtectionListener implements Listener {
 
         if (area == null) return;
 
-        if (area.hasException(player.getName(), "no_place")) {
+        if (plugin.getAreaManager().hasInheritedException(event.getBlock().getLocation(), player.getName(), "no_place")) {
             return;
         }
 
@@ -133,7 +131,6 @@ public class AreaProtectionListener implements Listener {
         String fluidId = bucket.toString().toLowerCase().replace("_bucket", "");
         fluidId = "minecraft:" + fluidId;
 
-        AdvancedAreaRules advancedRules = plugin.getAdvancedRulesManager().getRules(area.getId());
 
         Map<String, String> placeholders = NotificationManager.createFullPlaceholders(
                 fluidId,
@@ -150,7 +147,7 @@ public class AreaProtectionListener implements Listener {
         }
 
         if (plugin.getAreaManager().hasInheritedRule(event.getBlock().getLocation(), AreaRule.NO_PLACE)) {
-            if (advancedRules.hasBlock(AdvancedRuleType.YES_PLACE, fluidId)) {
+            if (plugin.getAreaManager().hasInheritedAdvancedBlock(event.getBlock().getLocation(), AdvancedRuleType.YES_PLACE, fluidId)) {
                 return;
             }
 
@@ -164,17 +161,20 @@ public class AreaProtectionListener implements Listener {
     public void onPlayerInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
 
+        if (event.getAction() == Action.LEFT_CLICK_BLOCK || event.getAction() == Action.LEFT_CLICK_AIR) {
+            return;
+        }
+
         if (event.getClickedBlock() != null) {
             ProtectedArea area = plugin.getAreaManager().getAreaAt(event.getClickedBlock().getLocation());
 
             if (area == null) return;
 
-            if (area.hasException(player.getName(), "no_interact")) {
+            if (plugin.getAreaManager().hasInheritedException(event.getClickedBlock().getLocation(), player.getName(), "no_interact")) {
                 return;
             }
 
             String blockId = event.getClickedBlock().getType().getKey().toString();
-            AdvancedAreaRules advancedRules = plugin.getAdvancedRulesManager().getRules(area.getId());
 
             Map<String, String> placeholders = NotificationManager.createFullPlaceholders(
                     blockId,
@@ -191,7 +191,7 @@ public class AreaProtectionListener implements Listener {
             }
 
             if (plugin.getAreaManager().hasInheritedRule(event.getClickedBlock().getLocation(), AreaRule.NO_INTERACT)) {
-                if (advancedRules.hasBlock(AdvancedRuleType.YES_INTERACT, blockId)) {
+                if (plugin.getAreaManager().hasInheritedAdvancedBlock(event.getClickedBlock().getLocation(), AdvancedRuleType.YES_INTERACT, blockId)) {
                     return;
                 }
 
@@ -204,7 +204,7 @@ public class AreaProtectionListener implements Listener {
 
         ProtectedArea area = plugin.getAreaManager().getAreaAt(player.getLocation());
         if (area != null) {
-            if (area.hasException(player.getName(), "no_interact")) {
+            if (plugin.getAreaManager().hasInheritedException(player.getLocation(), player.getName(), "no_interact")) {
                 return;
             }
 
@@ -245,7 +245,7 @@ public class AreaProtectionListener implements Listener {
 
         if (area == null) return;
 
-        if (area.hasException(attacker.getName(), "no_pvp")) {
+        if (plugin.getAreaManager().hasInheritedException(victim.getLocation(), attacker.getName(), "no_pvp")) {
             return;
         }
 
@@ -275,7 +275,7 @@ public class AreaProtectionListener implements Listener {
 
         if (area == null) return;
 
-        if (area.hasException(attacker.getName(), "no_entityattack")) {
+        if (plugin.getAreaManager().hasInheritedException(event.getEntity().getLocation(), attacker.getName(), "no_entityattack")) {
             return;
         }
 
@@ -302,7 +302,7 @@ public class AreaProtectionListener implements Listener {
 
         if (area == null) return;
 
-        if (area.hasException(player.getName(), "no_damage")) {
+        if (plugin.getAreaManager().hasInheritedException(player.getLocation(), player.getName(), "no_damage")) {
             return;
         }
 
@@ -352,12 +352,11 @@ public class AreaProtectionListener implements Listener {
 
         if (area == null) return;
 
-        if (area.hasException(player.getName(), "no_interact")) {
+        if (plugin.getAreaManager().hasInheritedException(event.getRightClicked().getLocation(), player.getName(), "no_interact")) {
             return;
         }
 
         String entityId = event.getRightClicked().getType().getKey().toString();
-        AdvancedAreaRules advancedRules = plugin.getAdvancedRulesManager().getRules(area.getId());
 
         Map<String, String> placeholders = NotificationManager.createFullPlaceholders(
                 null,
@@ -374,7 +373,7 @@ public class AreaProtectionListener implements Listener {
         }
 
         if (plugin.getAreaManager().hasInheritedRule(event.getRightClicked().getLocation(), AreaRule.NO_INTERACT)) {
-            if (advancedRules.hasEntity(AdvancedRuleType.YES_INTERACT, entityId)) {
+            if (plugin.getAreaManager().hasInheritedAdvancedEntity(event.getRightClicked().getLocation(), AdvancedRuleType.YES_INTERACT, entityId)) {
                 return;
             }
 
@@ -392,12 +391,11 @@ public class AreaProtectionListener implements Listener {
 
         if (area == null) return;
 
-        if (area.hasException(player.getName(), "no_interact")) {
+        if (plugin.getAreaManager().hasInheritedException(event.getVehicle().getLocation(), player.getName(), "no_interact")) {
             return;
         }
 
         String vehicleId = event.getVehicle().getType().getKey().toString();
-        AdvancedAreaRules advancedRules = plugin.getAdvancedRulesManager().getRules(area.getId());
 
         Map<String, String> placeholders = NotificationManager.createFullPlaceholders(
                 null,
@@ -414,7 +412,7 @@ public class AreaProtectionListener implements Listener {
         }
 
         if (plugin.getAreaManager().hasInheritedRule(event.getVehicle().getLocation(), AreaRule.NO_INTERACT)) {
-            if (advancedRules.hasEntity(AdvancedRuleType.YES_INTERACT, vehicleId)) {
+            if (plugin.getAreaManager().hasInheritedAdvancedEntity(event.getVehicle().getLocation(), AdvancedRuleType.YES_INTERACT, vehicleId)) {
                 return;
             }
 
@@ -435,12 +433,11 @@ public class AreaProtectionListener implements Listener {
 
             if (area == null) return;
 
-            if (area.hasException(player.getName(), "no_interact")) {
+            if (plugin.getAreaManager().hasInheritedException(entity.getLocation(), player.getName(), "no_interact")) {
                 return;
             }
 
             String entityId = entity.getType().getKey().toString();
-            AdvancedAreaRules advancedRules = plugin.getAdvancedRulesManager().getRules(area.getId());
 
             Map<String, String> placeholders = NotificationManager.createFullPlaceholders(
                     null,
@@ -456,7 +453,7 @@ public class AreaProtectionListener implements Listener {
             }
 
             if (plugin.getAreaManager().hasInheritedRule(entity.getLocation(), AreaRule.NO_INTERACT)) {
-                if (advancedRules.hasEntity(AdvancedRuleType.YES_INTERACT, entityId)) {
+                if (plugin.getAreaManager().hasInheritedAdvancedEntity(entity.getLocation(), AdvancedRuleType.YES_INTERACT, entityId)) {
                     return;
                 }
 
@@ -473,12 +470,11 @@ public class AreaProtectionListener implements Listener {
 
         if (area == null) return;
 
-        if (area.hasException(player.getName(), "no_drop")) {
+        if (plugin.getAreaManager().hasInheritedException(player.getLocation(), player.getName(), "no_drop")) {
             return;
         }
 
         String itemId = event.getItemDrop().getItemStack().getType().getKey().toString();
-        AdvancedAreaRules advancedRules = plugin.getAdvancedRulesManager().getRules(area.getId());
 
         Map<String, String> placeholders = NotificationManager.createFullPlaceholders(
                 itemId,
@@ -495,7 +491,7 @@ public class AreaProtectionListener implements Listener {
         }
 
         if (plugin.getAreaManager().hasInheritedRule(player.getLocation(), AreaRule.NO_DROP)) {
-            if (advancedRules.hasItem(AdvancedRuleType.YES_DROP, itemId)) {
+            if (plugin.getAreaManager().hasInheritedAdvancedItem(player.getLocation(), AdvancedRuleType.YES_DROP, itemId)) {
                 return;
             }
 
@@ -516,12 +512,11 @@ public class AreaProtectionListener implements Listener {
             return;
         }
 
-        if (area.hasException(player.getName(), "no_collect")) {
+        if (plugin.getAreaManager().hasInheritedException(player.getLocation(), player.getName(), "no_collect")) {
             return;
         }
 
         String itemId = event.getItem().getItemStack().getType().getKey().toString();
-        AdvancedAreaRules advancedRules = plugin.getAdvancedRulesManager().getRules(area.getId());
 
         Map<String, String> placeholders = NotificationManager.createFullPlaceholders(
                 itemId,
@@ -546,7 +541,7 @@ public class AreaProtectionListener implements Listener {
         }
 
         if (plugin.getAreaManager().hasInheritedRule(player.getLocation(), AreaRule.NO_COLLECT)) {
-            if (advancedRules.hasItem(AdvancedRuleType.YES_COLLECT, itemId)) {
+            if (plugin.getAreaManager().hasInheritedAdvancedItem(player.getLocation(), AdvancedRuleType.YES_COLLECT, itemId)) {
                 return;
             }
 

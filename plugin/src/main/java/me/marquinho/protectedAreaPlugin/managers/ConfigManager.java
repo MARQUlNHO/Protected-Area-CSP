@@ -1,10 +1,13 @@
 package me.marquinho.protectedAreaPlugin.managers;
 
 import me.marquinho.protectedAreaPlugin.ProtectedAreaPlugin;
+import me.marquinho.protectedAreaPlugin.models.ProtectedArea;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
 
 public class ConfigManager {
     private final ProtectedAreaPlugin plugin;
@@ -30,12 +33,13 @@ public class ConfigManager {
                 config = YamlConfiguration.loadConfiguration(configFile);
 
                 config.set("mod-required", false);
-                config.set("kick-message", "§c¡Necesitas tener el mod de cliente instalado para jugar en este servidor!");
+                config.set("kick-message", "§cYou need to have the client mod installed to play on this server!");
+                config.set("areas-hidden", Collections.emptyList());
 
                 config.save(configFile);
-                plugin.getLogger().info("Archivo Config.yml creado con valores por defecto");
+                plugin.getLogger().info("Config.yml file created with default values");
             } catch (IOException e) {
-                plugin.getLogger().severe("Error al crear Config.yml");
+                plugin.getLogger().severe("Error creating Config.yml");
                 e.printStackTrace();
             }
         } else {
@@ -45,7 +49,7 @@ public class ConfigManager {
 
     public void reloadConfig() {
         config = YamlConfiguration.loadConfiguration(configFile);
-        plugin.getLogger().info("Configuración recargada");
+        plugin.getLogger().info("Configuration reloaded");
     }
 
     public boolean isModRequired() {
@@ -58,7 +62,7 @@ public class ConfigManager {
     }
 
     public String getKickMessage() {
-        return config.getString("kick-message", "§c¡Necesitas tener el mod de cliente instalado para jugar en este servidor!");
+        return config.getString("kick-message", "§cYou need to have the client mod installed to play on this server!");
     }
 
     public void setKickMessage(String message) {
@@ -70,9 +74,20 @@ public class ConfigManager {
         try {
             config.save(configFile);
         } catch (IOException e) {
-            plugin.getLogger().severe("Error al guardar Config.yml");
+            plugin.getLogger().severe("Error saving Config.yml");
             e.printStackTrace();
         }
+    }
+
+    public List<String> getIgnoreCommandPrefixes() {
+        return config.getStringList("areas-hidden");
+    }
+
+    public boolean isIgnoredInCommand(ProtectedArea area) {
+        List<String> prefixes = getIgnoreCommandPrefixes();
+        if (prefixes.isEmpty()) return false;
+        String key = area.getStorageKey();
+        return prefixes.stream().anyMatch(key::startsWith);
     }
 
     public YamlConfiguration getConfig() {

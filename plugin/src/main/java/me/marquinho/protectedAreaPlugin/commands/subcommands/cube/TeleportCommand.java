@@ -13,6 +13,7 @@ import me.marquinho.protectedAreaPlugin.ProtectedAreaPlugin;
 import me.marquinho.protectedAreaPlugin.models.ProtectedArea;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -24,7 +25,7 @@ public class TeleportCommand {
 
     public static LiteralArgumentBuilder<CommandSourceStack> buildCommand(ProtectedAreaPlugin plugin) {
         return Commands.literal("tp")
-                .then(Commands.argument("area_id", StringArgumentType.word())
+                .then(Commands.argument("area_id", StringArgumentType.string())
                         .suggests(suggestAreaIds(plugin))
                         .then(Commands.argument("targets", ArgumentTypes.players())
                                 .executes(context -> executeTeleport(context, plugin, 0, 1))
@@ -52,16 +53,17 @@ public class TeleportCommand {
             PlayerSelectorArgumentResolver resolver = context.getArgument("targets", PlayerSelectorArgumentResolver.class);
             List<Player> targets = resolver.resolve(context.getSource());
 
-            if (targets.isEmpty()) { sender.sendMessage("§cNo se encontraron jugadores con ese selector"); return 0; }
+            if (targets.isEmpty()) { sender.sendMessage("§cNo players found"); return 0; }
 
             ProtectedArea area = plugin.getAreaManager().getAreas().get(areaId);
-            if (area == null) { sender.sendMessage("§cNo existe un área con el ID: " + areaId); return 0; }
+            if (area == null) { sender.sendMessage("§cNo area exists with ID: " + areaId); return 0; }
 
-            World world = plugin.getServer().getWorld(area.getWorldName());
-            if (world == null) { sender.sendMessage("§cEl mundo del área no existe: " + area.getWorldName()); return 0; }
+            NamespacedKey dimensionKey = NamespacedKey.fromString(area.getDimension());
+            World world = dimensionKey != null ? plugin.getServer().getWorld(dimensionKey) : null;
+            if (world == null) { sender.sendMessage("§cThe area's world does not exist: " + area.getDimension()); return 0; }
 
-            sender.sendMessage("§aTeletransportando §6" + targets.size() + " §ajugador(es) al área §6" + areaId);
-            sender.sendMessage("§eDelay: §6" + delayTicks + " ticks §7| §eGrupo: §6" + groupSize + " jugador(es)");
+            sender.sendMessage("§aTeleporting §6" + targets.size() + " §aplayer(s) to area §6" + areaId);
+            sender.sendMessage("§eDelay: §6" + delayTicks + " ticks §7| §eGroup: §6" + groupSize + " player(s)");
 
             teleportPlayersInGroups(plugin, new ArrayList<>(targets), area, world, delayTicks, groupSize, sender);
             return 1;
@@ -78,7 +80,7 @@ public class TeleportCommand {
             @Override
             public void run() {
                 if (index >= players.size()) {
-                    sender.sendMessage("§a¡Teletransporte completado!");
+                    sender.sendMessage("§aTeleport completed!");
                     cancel();
                     return;
                 }
@@ -93,7 +95,7 @@ public class TeleportCommand {
                         player.teleport(safeLoc);
                         usedLocations.add(safeLoc);
                     } else {
-                        sender.sendMessage("§cNo se pudo encontrar una ubicación segura para §6" + player.getName());
+                        sender.sendMessage("§cCould not find a safe location for §6" + player.getName());
                     }
                 }
 
@@ -143,9 +145,10 @@ public class TeleportCommand {
     private static SuggestionProvider<CommandSourceStack> suggestAreaIds(ProtectedAreaPlugin plugin) {
         return (context, builder) -> {
             plugin.getAreaManager().getAreas().entrySet().stream()
-                    .filter(e -> !e.getValue().isFlat())
+                    .filter(e -> e.getValue().isCube())
+                    .filter(e -> !plugin.getConfigManager().isIgnoredInCommand(e.getValue()))
                     .map(java.util.Map.Entry::getKey)
-                    .forEach(builder::suggest);
+                    .forEach(id -> builder.suggest(id.contains("/") ? "\"" + id + "\"" : id));
             return builder.buildFuture();
         };
     }

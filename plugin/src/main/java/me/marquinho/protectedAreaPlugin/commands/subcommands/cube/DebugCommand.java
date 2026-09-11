@@ -33,22 +33,22 @@ public class DebugCommand {
         boolean enabled = BoolArgumentType.getBool(context, "enabled");
 
         if (targets.isEmpty()) {
-            sender.sendMessage("§cNo se encontraron jugadores con ese selector.");
+            sender.sendMessage("§cNo players found matching that selector.");
             return 0;
         }
 
         for (Player target : targets) {
             if (enabled) {
                 plugin.getDebugManager().enableDebug(target);
-                sender.sendMessage("§aDebug activado para §6" + target.getName());
+                sender.sendMessage("§aDebug enabled for §6" + target.getName());
                 if (!target.equals(sender)) {
-                    target.sendMessage("§e[Debug] §aModo debug activado por §6" + sender.getName());
+                    target.sendMessage("§e[Debug] §aDebug mode enabled by §6" + sender.getName());
                 }
             } else {
                 plugin.getDebugManager().disableDebug(target);
-                sender.sendMessage("§cDebug desactivado para §6" + target.getName());
+                sender.sendMessage("§cDebug disabled for §6" + target.getName());
                 if (!target.equals(sender)) {
-                    target.sendMessage("§e[Debug] §cModo debug desactivado por §6" + sender.getName());
+                    target.sendMessage("§e[Debug] §cDebug mode disabled by §6" + sender.getName());
                 }
             }
         }

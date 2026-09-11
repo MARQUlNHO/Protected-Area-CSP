@@ -101,6 +101,36 @@ public class AreaCommandManager {
         file.delete();
     }
 
+    public int applyUsesToOfflineCaches(String areaId, String type, int index, int amount, boolean set, int maxUses) {
+        File[] files = getCacheFolder().listFiles((dir, name) -> name.endsWith(".yml"));
+        if (files == null) return 0;
+
+        String key = buildCacheKey(areaId, type, index);
+        int modified = 0;
+
+        for (File file : files) {
+            YamlConfiguration cache = YamlConfiguration.loadConfiguration(file);
+
+            int newValue;
+            if (set) {
+                newValue = amount;
+            } else {
+                int current = cache.contains(key) ? cache.getInt(key) : maxUses;
+                newValue = current + amount;
+            }
+            cache.set(key, newValue);
+
+            try {
+                cache.save(file);
+                modified++;
+            } catch (IOException e) {
+                plugin.getLogger().severe("Error al actualizar cache: " + file.getName());
+                e.printStackTrace();
+            }
+        }
+        return modified;
+    }
+
     public void shiftUsesAfterRemove(String areaId, String type, int removedIndex, int totalBefore) {
         for (Player player : plugin.getServer().getOnlinePlayers()) {
             shiftPdc(player, areaId, type, removedIndex, totalBefore);

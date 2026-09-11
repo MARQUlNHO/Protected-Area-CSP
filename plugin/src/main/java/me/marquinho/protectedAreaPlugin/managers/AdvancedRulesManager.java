@@ -32,19 +32,34 @@ public class AdvancedRulesManager {
             return;
         }
 
-        File[] files = rulesFolder.listFiles((dir, name) -> name.endsWith(".yml"));
-        if (files == null) return;
+        loadRulesRecursively(rulesFolder);
 
-        for (File file : files) {
-            loadRulesFromFile(file);
-        }
-
-        plugin.getLogger().info("Cargadas " + advancedRules.size() + " configuraciones de reglas avanzadas");
+        plugin.getLogger().info("Loaded " + advancedRules.size() + " advanced rule configurations");
     }
 
-    private void loadRulesFromFile(File file) {
+    private void loadRulesRecursively(File currentFolder) {
+        File[] entries = currentFolder.listFiles();
+        if (entries == null) return;
+
+        for (File entry : entries) {
+            if (entry.isDirectory()) {
+                loadRulesRecursively(entry);
+            } else if (entry.getName().endsWith(".yml")) {
+                String relativePath = rulesFolder.toPath().relativize(entry.toPath()).toString();
+                String areaId = relativePath.replace(File.separator, "/").replace(".yml", "");
+                loadRulesFromFile(entry, areaId);
+            }
+        }
+    }
+
+    public void reloadRulesFor(String areaId) {
+        advancedRules.remove(areaId);
+        File file = new File(rulesFolder, areaId + ".yml");
+        if (file.exists()) loadRulesFromFile(file, areaId);
+    }
+
+    private void loadRulesFromFile(File file, String areaId) {
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
-        String areaId = file.getName().replace(".yml", "");
 
         AdvancedAreaRules rules = new AdvancedAreaRules(areaId);
 
@@ -94,7 +109,7 @@ public class AdvancedRulesManager {
         try {
             config.save(file);
         } catch (IOException e) {
-            plugin.getLogger().severe("Error al guardar reglas avanzadas para el área: " + areaId);
+            plugin.getLogger().severe("Error saving advanced rules for area: " + areaId);
             e.printStackTrace();
         }
     }

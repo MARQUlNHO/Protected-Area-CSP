@@ -9,19 +9,33 @@ import org.bukkit.entity.Player;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 public class NotificationManager {
     private final ProtectedAreaPlugin plugin;
     private final File notificationsFolder;
     private final MiniMessage miniMessage;
     private final Map<String, YamlConfiguration> configCache;
+    private final Map<UUID, TickBucket> recentMessages;
+
+    private static final int PRUNE_THRESHOLD = 256;
+    private static final int STALE_TICKS = 20;
+
+    private static final class TickBucket {
+        private int tick = Integer.MIN_VALUE;
+        private final Set<String> messages = new HashSet<>();
+    }
 
     public NotificationManager(ProtectedAreaPlugin plugin) {
         this.plugin = plugin;
         this.notificationsFolder = new File(plugin.getDataFolder(), "AreaNotification");
         this.miniMessage = MiniMessage.miniMessage();
         this.configCache = new HashMap<>();
+        this.recentMessages = new HashMap<>();
 
         if (!notificationsFolder.exists()) {
             notificationsFolder.mkdirs();
@@ -41,21 +55,21 @@ public class NotificationManager {
 
         YamlConfiguration config = new YamlConfiguration();
 
-        config.set("no_break", "<red>¡No puedes romper bloques en esta área!</red>");
+        config.set("no_break", "<red>You cannot break blocks in this area!</red>");
 
-        config.set("no_place", "<red>¡No puedes colocar bloques en esta área!</red>");
-        config.set("no_place_fluid", "<red>¡No puedes colocar fluidos en esta área!</red>");
+        config.set("no_place", "<red>You cannot place blocks in this area!</red>");
+        config.set("no_place_fluid", "<red>You cannot place fluids in this area!</red>");
 
-        config.set("no_interact", "<red>¡No puedes interactuar en esta área!</red>");
-        config.set("no_interact_entity", "<red>¡No puedes interactuar con entidades en esta área!</red>");
-        config.set("no_interact_vehicle", "<red>¡No puedes montarte en vehículos en esta área!</red>");
-        config.set("no_interact_inventory", "<red>¡No puedes abrir inventarios en esta área!</red>");
+        config.set("no_interact", "<red>You cannot interact in this area!</red>");
+        config.set("no_interact_entity", "<red>You cannot interact with entities in this area!</red>");
+        config.set("no_interact_vehicle", "<red>You cannot ride vehicles in this area!</red>");
+        config.set("no_interact_inventory", "<red>You cannot open inventories in this area!</red>");
 
-        config.set("no_pvp", "<red>¡No puedes atacar jugadores en esta área!</red>");
-        config.set("no_entityattack", "<red>¡No puedes atacar entidades en esta área!</red>");
+        config.set("no_pvp", "<red>You cannot attack players in this area!</red>");
+        config.set("no_entityattack", "<red>You cannot attack entities in this area!</red>");
 
-        config.set("no_drop", "<red>¡No puedes tirar items en esta área!</red>");
-        config.set("no_collect", "<red>¡No puedes recoger items en esta área!</red>");
+        config.set("no_drop", "<red>You cannot drop items in this area!</red>");
+        config.set("no_collect", "<red>You cannot collect items in this area!</red>");
 
         config.set("no_entry_collision", "");
         config.set("no_exit_collision", "");
@@ -63,9 +77,9 @@ public class NotificationManager {
 
         try {
             config.save(file);
-            plugin.getLogger().info("Creado archivo de configuración: Rules.yml");
+            plugin.getLogger().info("Created configuration file: Rules.yml");
         } catch (IOException e) {
-            plugin.getLogger().severe("Error al crear Rules.yml");
+            plugin.getLogger().severe("Error creating Rules.yml");
             e.printStackTrace();
         }
     }
@@ -76,31 +90,31 @@ public class NotificationManager {
 
         YamlConfiguration config = new YamlConfiguration();
 
-        config.set("no_break_specific", "<red>¡No puedes romper <gold>{blockid}</gold> en esta área!</red>");
+        config.set("no_break_specific", "<red>You cannot break <gold>{blockid}</gold> in this area!</red>");
 
-        config.set("no_place_specific", "<red>¡No puedes colocar <gold>{blockid}</gold> en esta área!</red>");
-        config.set("no_place_fluid_specific", "<red>¡No puedes colocar <gold>{blockid}</gold> en esta área!</red>");
+        config.set("no_place_specific", "<red>You cannot place <gold>{blockid}</gold> in this area!</red>");
+        config.set("no_place_fluid_specific", "<red>You cannot place <gold>{blockid}</gold> in this area!</red>");
 
-        config.set("no_interact_block", "<red>¡No puedes interactuar con <gold>{blockid}</gold> en esta área!</red>");
-        config.set("no_interact_entity", "<red>¡No puedes interactuar con <gold>{entityid}</gold> en esta área!</red>");
-        config.set("no_interact_vehicle", "<red>¡No puedes montarte en <gold>{entityid}</gold> en esta área!</red>");
-        config.set("no_interact_inventory", "<red>¡No puedes abrir inventarios de <gold>{entityid}</gold> en esta área!</red>");
+        config.set("no_interact_block", "<red>You cannot interact with <gold>{blockid}</gold> in this area!</red>");
+        config.set("no_interact_entity", "<red>You cannot interact with <gold>{entityid}</gold> in this area!</red>");
+        config.set("no_interact_vehicle", "<red>You cannot ride <gold>{entityid}</gold> in this area!</red>");
+        config.set("no_interact_inventory", "<red>You cannot open <gold>{entityid}</gold>'s inventory in this area!</red>");
 
-        config.set("no_drop_specific", "<red>¡No puedes tirar <gold>{itemid}</gold> en esta área!</red>");
-        config.set("no_collect_specific", "<red>¡No puedes recoger <gold>{itemid}</gold> en esta área!</red>");
+        config.set("no_drop_specific", "<red>You cannot drop <gold>{itemid}</gold> in this area!</red>");
+        config.set("no_collect_specific", "<red>You cannot collect <gold>{itemid}</gold> in this area!</red>");
 
         try {
             config.save(file);
-            plugin.getLogger().info("Creado archivo de configuración: AdvancedRules.yml");
+            plugin.getLogger().info("Created configuration file: AdvancedRules.yml");
         } catch (IOException e) {
-            plugin.getLogger().severe("Error al crear AdvancedRules.yml");
+            plugin.getLogger().severe("Error creating AdvancedRules.yml");
             e.printStackTrace();
         }
     }
 
     public void reloadConfigs() {
         configCache.clear();
-        plugin.getLogger().info("Configuraciones de notificaciones recargadas");
+        plugin.getLogger().info("Notification configurations reloaded");
     }
 
     private YamlConfiguration getConfig(String fileName) {
@@ -110,7 +124,7 @@ public class NotificationManager {
 
         File file = new File(notificationsFolder, fileName + ".yml");
         if (!file.exists()) {
-            plugin.getLogger().warning("Archivo de notificación no encontrado: " + fileName + ".yml");
+            plugin.getLogger().warning("Notification file not found: " + fileName + ".yml");
             return new YamlConfiguration();
         }
 
@@ -129,8 +143,43 @@ public class NotificationManager {
 
         message = replacePlaceholders(message, placeholders);
 
+        if (isDuplicateThisTick(player, configFile + ":" + key + ":" + message)) {
+            return;
+        }
+
         Component component = miniMessage.deserialize(message);
         player.sendMessage(component);
+    }
+
+    private boolean isDuplicateThisTick(Player player, String identity) {
+        int tick = plugin.getServer().getCurrentTick();
+        TickBucket bucket = recentMessages.get(player.getUniqueId());
+
+        if (bucket == null) {
+            pruneStaleBuckets(tick);
+            bucket = new TickBucket();
+            recentMessages.put(player.getUniqueId(), bucket);
+        }
+
+        if (bucket.tick != tick) {
+            bucket.tick = tick;
+            bucket.messages.clear();
+        }
+
+        return !bucket.messages.add(identity);
+    }
+
+    private void pruneStaleBuckets(int tick) {
+        if (recentMessages.size() < PRUNE_THRESHOLD) {
+            return;
+        }
+
+        Iterator<TickBucket> it = recentMessages.values().iterator();
+        while (it.hasNext()) {
+            if (tick - it.next().tick > STALE_TICKS) {
+                it.remove();
+            }
+        }
     }
 
     private String replacePlaceholders(String message, Map<String, String> placeholders) {

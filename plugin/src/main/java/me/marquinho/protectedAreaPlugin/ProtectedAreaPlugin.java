@@ -18,6 +18,7 @@ public final class ProtectedAreaPlugin extends JavaPlugin {
     private ConfigManager configManager;
     private DebugManager debugManager;
     private AreaCommandManager areaCommandManager;
+    private WandManager wandManager;
     private ModVerificationListener modVerificationListener;
 
     @Override
@@ -33,6 +34,7 @@ public final class ProtectedAreaPlugin extends JavaPlugin {
         configManager = new ConfigManager(this);
 
         areaManager = new AreaManager(this);
+        areaManager.provisionDimensionAreas();
         areaManager.loadAllAreas();
 
         advancedRulesManager = new AdvancedRulesManager(this);
@@ -41,6 +43,8 @@ public final class ProtectedAreaPlugin extends JavaPlugin {
         notificationManager = new NotificationManager(this);
 
         debugManager = new DebugManager(this);
+
+        wandManager = new WandManager();
 
         modVerificationListener = new ModVerificationListener(this);
 
@@ -54,12 +58,14 @@ public final class ProtectedAreaPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new AreaProtectionListener(this), this);
         getServer().getPluginManager().registerEvents(modVerificationListener, this);
         getServer().getPluginManager().registerEvents(new PlayerQuitListener(this), this);
+        getServer().getPluginManager().registerEvents(new WandListener(this), this);
 
         getServer().getPluginManager().registerEvents(new org.bukkit.event.Listener() {
             @org.bukkit.event.EventHandler
             public void onPlayerQuit(PlayerQuitEvent event) {
                 modVerificationListener.cleanupPlayer(event.getPlayer().getUniqueId());
                 debugManager.removeSession(event.getPlayer().getUniqueId());
+                wandManager.removePlayer(event.getPlayer().getUniqueId());
             }
         }, this);
 
@@ -105,5 +111,9 @@ public final class ProtectedAreaPlugin extends JavaPlugin {
 
     public ModVerificationListener getModVerificationListener() {
         return modVerificationListener;
+    }
+
+    public WandManager getWandManager() {
+        return wandManager;
     }
 }

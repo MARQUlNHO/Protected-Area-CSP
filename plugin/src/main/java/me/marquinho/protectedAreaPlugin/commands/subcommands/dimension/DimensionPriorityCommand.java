@@ -1,25 +1,23 @@
-package me.marquinho.protectedAreaPlugin.commands.subcommands.cube;
+package me.marquinho.protectedAreaPlugin.commands.subcommands.dimension;
 
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
-import com.mojang.brigadier.suggestion.SuggestionProvider;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 import me.marquinho.protectedAreaPlugin.ProtectedAreaPlugin;
 import me.marquinho.protectedAreaPlugin.models.ProtectedArea;
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
 
 import java.util.List;
 
-public class PriorityCommand {
+public class DimensionPriorityCommand {
 
     public static LiteralArgumentBuilder<CommandSourceStack> buildCommand(ProtectedAreaPlugin plugin) {
         return Commands.literal("priority")
-                .then(Commands.argument("id", StringArgumentType.string())
-                        .suggests(suggestAreaIds(plugin))
+                .then(Commands.argument("area_id", StringArgumentType.string())
+                        .suggests(DimensionAreas.suggestIds(plugin))
                         .then(Commands.argument("value", IntegerArgumentType.integer(Integer.MIN_VALUE + 1))
                                 .executes(context -> executePriority(context, plugin))
                         )
@@ -28,26 +26,24 @@ public class PriorityCommand {
 
     private static int executePriority(CommandContext<CommandSourceStack> context, ProtectedAreaPlugin plugin) {
         CommandSender sender = context.getSource().getSender();
-
-        String areaId = StringArgumentType.getString(context, "id");
+        String areaId = StringArgumentType.getString(context, "area_id");
         int priority = IntegerArgumentType.getInteger(context, "value");
 
-        if (areaId.endsWith("/")) {
-            List<ProtectedArea> list = plugin.getAreaManager().getAreasByFolder(areaId);
-            if (list.isEmpty()) { sender.sendMessage("§cNo areas in folder: " + areaId); return 0; }
+        if (DimensionAreas.isFolder(areaId)) {
+            List<ProtectedArea> areaList = DimensionAreas.resolveFolder(sender, plugin, areaId);
+            if (areaList == null) return 0;
             int count = 0;
-            for (ProtectedArea a : list) if (plugin.getAreaManager().setAreaPriority(a.getId(), priority)) count++;
+            for (ProtectedArea a : areaList) if (plugin.getAreaManager().setAreaPriority(a.getId(), priority)) count++;
+            plugin.getAreaManager().broadcastDimensionSkyboxes();
             sender.sendMessage("§aPriority §6" + priority + " §aapplied to §6" + count + " §aarea(s) in §6" + areaId);
             return 1;
         }
 
-        ProtectedArea area = plugin.getAreaManager().getAreas().get(areaId);
-        if (area == null) {
-            sender.sendMessage("§cNo area exists with ID: " + areaId);
-            return 0;
-        }
+        ProtectedArea area = DimensionAreas.resolve(sender, plugin, areaId);
+        if (area == null) return 0;
 
         if (plugin.getAreaManager().setAreaPriority(areaId, priority)) {
+            plugin.getAreaManager().broadcastDimensionSkyboxes();
             sender.sendMessage("§aPriority updated successfully!");
             sender.sendMessage("§eArea: §6" + areaId);
             sender.sendMessage("§ePriority: §6" + priority);
@@ -58,16 +54,5 @@ public class PriorityCommand {
             sender.sendMessage("§cError updating the priority");
             return 0;
         }
-    }
-
-    private static SuggestionProvider<CommandSourceStack> suggestAreaIds(ProtectedAreaPlugin plugin) {
-        return (context, builder) -> {
-            plugin.getAreaManager().getAreas().entrySet().stream()
-                    .filter(e -> e.getValue().isCube())
-                    .filter(e -> !plugin.getConfigManager().isIgnoredInCommand(e.getValue()))
-                    .map(java.util.Map.Entry::getKey)
-                    .forEach(id -> builder.suggest(id.contains("/") ? "\"" + id + "\"" : id));
-            return builder.buildFuture();
-        };
     }
 }

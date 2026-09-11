@@ -1,11 +1,9 @@
 package me.marquinho.protectedAreaPlugin.models;
 
 import java.util.*;
-import me.marquinho.protectedAreaPlugin.models.AreaCommandEntry;
 
 public class ProtectedArea {
     private String id;
-    private String worldName;
     private String dimension;
     private int x1, y1, z1;
     private int x2, y2, z2;
@@ -27,9 +25,8 @@ public class ProtectedArea {
     private List<AreaCommandEntry> entryCommands;
     private List<AreaCommandEntry> exitCommands;
 
-    public ProtectedArea(String id, String worldName, String dimension, int x1, int y1, int z1, int x2, int y2, int z2) {
+    public ProtectedArea(String id, String dimension, int x1, int y1, int z1, int x2, int y2, int z2) {
         this.id = id;
-        this.worldName = worldName;
         this.dimension = dimension;
         this.x1 = Math.min(x1, x2);
         this.y1 = Math.min(y1, y2);
@@ -51,13 +48,13 @@ public class ProtectedArea {
         this.exitCommands  = new ArrayList<>();
     }
 
-    public boolean isInside(double x, double y, double z, String worldName, String worldDimension) {
-        if (!this.worldName.equals(worldName)) {
+    public boolean isInside(double x, double y, double z, String worldDimension) {
+        if (!this.dimension.equals(worldDimension)) {
             return false;
         }
 
-        if (!this.dimension.equals(worldDimension)) {
-            return false;
+        if (isDimension()) {
+            return true;
         }
 
         return x >= x1 && x <= x2 &&
@@ -166,7 +163,6 @@ public class ProtectedArea {
     }
 
     public String getId() { return id; }
-    public String getWorldName() { return worldName; }
     public String getDimension() { return dimension; }
     public int getX1() { return x1; }
     public int getY1() { return y1; }
@@ -184,6 +180,15 @@ public class ProtectedArea {
     public String getType() { return type; }
     public void setType(String type) { this.type = (type == null || type.isEmpty()) ? "cube" : type; }
     public boolean isFlat() { return "flat".equals(type); }
+    public boolean isCube() { return type == null || type.isEmpty() || "cube".equals(type); }
+    public boolean isDimension() { return "dimension".equals(type); }
+
+    public String getStorageKey() {
+        if (isDimension()) return ".dimension/" + id;
+        if (isFlat()) return ".flat/" + id;
+        return id;
+    }
+
     public int getFlatPosition() { return flatPosition; }
     public void setFlatPosition(int flatPosition) { this.flatPosition = flatPosition; }
 

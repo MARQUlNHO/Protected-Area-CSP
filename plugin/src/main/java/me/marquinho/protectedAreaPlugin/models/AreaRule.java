@@ -1,18 +1,18 @@
 package me.marquinho.protectedAreaPlugin.models;
 
 public enum AreaRule {
-    NO_BREAK("no_break", "No se pueden romper bloques"),
-    NO_PLACE("no_place", "No se pueden colocar bloques"),
-    NO_INTERACT("no_interact", "No se puede interactuar con bloques/entidades"),
-    NO_MOBGRIEFING("no_mobgriefing", "Las entidades no pueden romper bloques"),
-    NO_PVP("no_pvp", "No hay combate entre jugadores"),
-    NO_ENTITYATTACK("no_entityattack", "Los jugadores no pueden atacar entidades"),
-    NO_DAMAGE("no_damage", "Los jugadores no reciben daño"),
-    NO_DROP("no_drop", "Los jugadores no pueden tirar items"),
-    NO_COLLECT("no_collect", "Los jugadores no pueden recoger items"),
-    NO_SPAWN("no_spawn", "No hay spawn natural de entidades"),
-    NO_ENTRY("no_entry", "Impide la entrada al área (barrera invisible)"),
-    NO_EXIT("no_exit", "Impide la salida del área (permite entrada)");
+    NO_BREAK("no_break", "Blocks cannot be broken"),
+    NO_PLACE("no_place", "Blocks cannot be placed"),
+    NO_INTERACT("no_interact", "Cannot interact with blocks/entities"),
+    NO_MOBGRIEFING("no_mobgriefing", "Entities cannot break blocks"),
+    NO_PVP("no_pvp", "No combat between players"),
+    NO_ENTITYATTACK("no_entityattack", "Players cannot attack entities"),
+    NO_DAMAGE("no_damage", "Players take no damage"),
+    NO_DROP("no_drop", "Players cannot drop items"),
+    NO_COLLECT("no_collect", "Players cannot collect items"),
+    NO_SPAWN("no_spawn", "No natural entity spawning"),
+    NO_ENTRY("no_entry", "Prevents entry into the area (invisible barrier)"),
+    NO_EXIT("no_exit", "Prevents exiting the area (allows entry)");
 
     private final String key;
     private final String description;

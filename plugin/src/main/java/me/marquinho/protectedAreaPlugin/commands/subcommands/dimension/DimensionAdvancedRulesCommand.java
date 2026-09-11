@@ -1,27 +1,27 @@
-package me.marquinho.protectedAreaPlugin.commands.subcommands.cube;
+package me.marquinho.protectedAreaPlugin.commands.subcommands.dimension;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
-import com.mojang.brigadier.suggestion.SuggestionProvider;
+import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
+import io.papermc.paper.registry.RegistryKey;
 import me.marquinho.protectedAreaPlugin.ProtectedAreaPlugin;
 import me.marquinho.protectedAreaPlugin.models.AdvancedAreaRules;
 import me.marquinho.protectedAreaPlugin.models.AdvancedRuleType;
 import me.marquinho.protectedAreaPlugin.models.AdvancedRuleType.Target;
 import me.marquinho.protectedAreaPlugin.models.ProtectedArea;
-import io.papermc.paper.command.brigadier.CommandSourceStack;
-import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
-import io.papermc.paper.registry.RegistryKey;
 import org.bukkit.block.BlockType;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.EntityType;
 import org.bukkit.inventory.ItemType;
 
+import java.util.List;
 import java.util.Set;
 
-public class AdvancedRulesCommand {
+public class DimensionAdvancedRulesCommand {
 
     private static final String ARG_AREA = "area_id";
     private static final String ARG_BLOCK = "block_id";
@@ -59,11 +59,24 @@ public class AdvancedRulesCommand {
         CommandSender sender = context.getSource().getSender();
         String areaId = StringArgumentType.getString(context, ARG_AREA);
 
-        ProtectedArea area = plugin.getAreaManager().getAreas().get(areaId);
-        if (area == null) {
-            sender.sendMessage("§cNo area exists with ID: " + areaId);
-            return 0;
+        if (DimensionAreas.isFolder(areaId)) {
+            List<ProtectedArea> areaList = DimensionAreas.resolveFolder(sender, plugin, areaId);
+            if (areaList == null) return 0;
+            String folderTargetId = resolveTargetId(context, target);
+            int count = 0;
+            for (ProtectedArea a : areaList) {
+                String folderKey = a.getStorageKey();
+                boolean applied = target == Target.ENTITY
+                        ? plugin.getAdvancedRulesManager().addEntityRule(folderKey, ruleType, folderTargetId)
+                        : plugin.getAdvancedRulesManager().addBlockRule(folderKey, ruleType, folderTargetId);
+                if (applied) count++;
+            }
+            sender.sendMessage("§aAdvanced rule §6" + ruleType.getKey() + " §aapplied to §6" + count + " §aarea(s) in §6" + areaId);
+            return 1;
         }
+
+        ProtectedArea area = DimensionAreas.resolve(sender, plugin, areaId);
+        if (area == null) return 0;
 
         String targetId = resolveTargetId(context, target);
 
@@ -109,7 +122,18 @@ public class AdvancedRulesCommand {
         CommandSender sender = context.getSource().getSender();
         String areaId = StringArgumentType.getString(context, ARG_AREA);
 
-        plugin.getAdvancedRulesManager().clearRule(storageKey(plugin, areaId), ruleType);
+        if (DimensionAreas.isFolder(areaId)) {
+            List<ProtectedArea> areaList = DimensionAreas.resolveFolder(sender, plugin, areaId);
+            if (areaList == null) return 0;
+            for (ProtectedArea a : areaList) plugin.getAdvancedRulesManager().clearRule(a.getStorageKey(), ruleType);
+            sender.sendMessage("§aAdvanced rules of type §6" + ruleType.getKey() + " §aremoved from §6" + areaList.size() + " §aarea(s) in §6" + areaId);
+            return 1;
+        }
+
+        ProtectedArea area = DimensionAreas.resolve(sender, plugin, areaId);
+        if (area == null) return 0;
+
+        plugin.getAdvancedRulesManager().clearRule(area.getStorageKey(), ruleType);
         sender.sendMessage("§aAll rules of type §6" + ruleType.getKey() + " §ahave been removed!");
         return 1;
     }
@@ -119,9 +143,28 @@ public class AdvancedRulesCommand {
         CommandSender sender = context.getSource().getSender();
         String areaId = StringArgumentType.getString(context, ARG_AREA);
 
+        if (DimensionAreas.isFolder(areaId)) {
+            List<ProtectedArea> areaList = DimensionAreas.resolveFolder(sender, plugin, areaId);
+            if (areaList == null) return 0;
+            String folderTargetId = resolveTargetId(context, target);
+            int count = 0;
+            for (ProtectedArea a : areaList) {
+                String folderKey = a.getStorageKey();
+                boolean cleared = target == Target.ENTITY
+                        ? plugin.getAdvancedRulesManager().removeEntityRule(folderKey, ruleType, folderTargetId)
+                        : plugin.getAdvancedRulesManager().removeBlockRule(folderKey, ruleType, folderTargetId);
+                if (cleared) count++;
+            }
+            sender.sendMessage("§aAdvanced rule §6" + ruleType.getKey() + " §aremoved from §6" + count + " §aarea(s) in §6" + areaId);
+            return 1;
+        }
+
+        ProtectedArea area = DimensionAreas.resolve(sender, plugin, areaId);
+        if (area == null) return 0;
+
         String targetId = resolveTargetId(context, target);
 
-        String key = storageKey(plugin, areaId);
+        String key = area.getStorageKey();
         boolean removed = target == Target.ENTITY
                 ? plugin.getAdvancedRulesManager().removeEntityRule(key, ruleType, targetId)
                 : plugin.getAdvancedRulesManager().removeBlockRule(key, ruleType, targetId);
@@ -153,7 +196,10 @@ public class AdvancedRulesCommand {
         CommandSender sender = context.getSource().getSender();
         String areaId = StringArgumentType.getString(context, ARG_AREA);
 
-        AdvancedAreaRules rules = plugin.getAdvancedRulesManager().getRules(storageKey(plugin, areaId));
+        ProtectedArea area = DimensionAreas.resolve(sender, plugin, areaId);
+        if (area == null) return 0;
+
+        AdvancedAreaRules rules = plugin.getAdvancedRulesManager().getRules(area.getStorageKey());
         Set<String> blocks = rules.getBlocks(ruleType);
         Set<String> entities = rules.getEntities(ruleType);
 
@@ -180,13 +226,8 @@ public class AdvancedRulesCommand {
         return 1;
     }
 
-    private static String storageKey(ProtectedAreaPlugin plugin, String areaId) {
-        ProtectedArea area = plugin.getAreaManager().getAreas().get(areaId);
-        return area != null ? area.getStorageKey() : areaId;
-    }
-
     private static RequiredArgumentBuilder<CommandSourceStack, String> areaArgument(ProtectedAreaPlugin plugin) {
-        return Commands.argument(ARG_AREA, StringArgumentType.string()).suggests(suggestAreaIds(plugin));
+        return Commands.argument(ARG_AREA, StringArgumentType.string()).suggests(DimensionAreas.suggestIds(plugin));
     }
 
     private static RequiredArgumentBuilder<CommandSourceStack, ?> targetArgument(Target target) {
@@ -202,17 +243,6 @@ public class AdvancedRulesCommand {
             case BLOCK -> context.getArgument(ARG_BLOCK, BlockType.class).getKey().asString();
             case ITEM -> context.getArgument(ARG_ITEM, ItemType.class).getKey().asString();
             case ENTITY -> context.getArgument(ARG_ENTITY, EntityType.class).getKey().asString();
-        };
-    }
-
-    private static SuggestionProvider<CommandSourceStack> suggestAreaIds(ProtectedAreaPlugin plugin) {
-        return (context, builder) -> {
-            plugin.getAreaManager().getAreas().entrySet().stream()
-                    .filter(e -> e.getValue().isCube())
-                    .filter(e -> !plugin.getConfigManager().isIgnoredInCommand(e.getValue()))
-                    .map(java.util.Map.Entry::getKey)
-                    .forEach(id -> builder.suggest(id.contains("/") ? "\"" + id + "\"" : id));
-            return builder.buildFuture();
         };
     }
 }

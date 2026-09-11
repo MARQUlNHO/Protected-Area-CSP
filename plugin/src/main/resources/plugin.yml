@@ -1,5 +1,5 @@
 name: ProtectedAreaPlugin
-version: '1.0.3-paper'
+version: '1.0.4-paper'
 main: me.marquinho.protectedAreaPlugin.ProtectedAreaPlugin
 api-version: '1.21'
 authors: [ Marquinho ]
@@ -8,5 +8,5 @@ website: https://zio-o.com/
 
 permissions:
   protectedarea.admin:
-    description: Permite gestionar áreas protegidas
+    description: Allows managing protected areas
     default: op

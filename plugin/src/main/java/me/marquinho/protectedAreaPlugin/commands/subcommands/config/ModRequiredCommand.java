@@ -25,11 +25,11 @@ public class ModRequiredCommand {
         plugin.getConfigManager().setModRequired(enabled);
 
         if (enabled) {
-            sender.sendMessage("§a¡Sistema de mod obligatorio ACTIVADO!");
-            sender.sendMessage("§eLos jugadores sin el mod de cliente serán expulsados del servidor");
+            sender.sendMessage("§aMandatory mod system ENABLED!");
+            sender.sendMessage("§ePlayers without the client mod will be kicked from the server");
         } else {
-            sender.sendMessage("§c¡Sistema de mod obligatorio DESACTIVADO!");
-            sender.sendMessage("§eLos jugadores pueden unirse sin el mod de cliente");
+            sender.sendMessage("§cMandatory mod system DISABLED!");
+            sender.sendMessage("§ePlayers can join without the client mod");
         }
 
         return 1;
@@ -40,19 +40,19 @@ public class ModRequiredCommand {
         boolean isRequired = plugin.getConfigManager().isModRequired();
 
         sender.sendMessage("§e§m                                          ");
-        sender.sendMessage("§6§lEstado del Sistema de Mod Obligatorio");
+        sender.sendMessage("§6§lMandatory Mod System Status");
         sender.sendMessage("");
 
         if (isRequired) {
-            sender.sendMessage("  §aEstado: §2§lACTIVADO");
-            sender.sendMessage("  §7Los jugadores deben tener el mod instalado");
+            sender.sendMessage("  §aStatus: §2§lENABLED");
+            sender.sendMessage("  §7Players must have the mod installed");
         } else {
-            sender.sendMessage("  §cEstado: §4§lDESACTIVADO");
-            sender.sendMessage("  §7Los jugadores pueden unirse sin el mod");
+            sender.sendMessage("  §cStatus: §4§lDISABLED");
+            sender.sendMessage("  §7Players can join without the mod");
         }
 
         sender.sendMessage("");
-        sender.sendMessage("  §eMensaje de expulsión:");
+        sender.sendMessage("  §eKick message:");
         sender.sendMessage("  §7" + plugin.getConfigManager().getKickMessage());
         sender.sendMessage("");
         sender.sendMessage("§e§m                                          ");

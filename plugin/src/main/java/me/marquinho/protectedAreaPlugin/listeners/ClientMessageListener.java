@@ -84,19 +84,20 @@ public class ClientMessageListener implements PluginMessageListener {
                 boolean positiveDirection = in.readBoolean();
                 ProtectedArea area = plugin.getAreaManager().getAreas().get(areaId);
                 if (area != null) {
-                    plugin.getLogger().info("[FlatArea] " + player.getName() + " cruzó: " + areaId
-                            + " | Dirección: " + (positiveDirection ? "positiva (+)" : "negativa (-)"));
+//                    plugin.getLogger().info("[FlatArea] " + player.getName() + " cruzó: " + areaId
+//                            + " | Dirección: " + (positiveDirection ? "positiva (+)" : "negativa (-)"));
                     plugin.getAreaCommandManager().triggerCommands(player, areaId, positiveDirection);
                     plugin.getServer().getPluginManager().callEvent(new PlayerCrossedFlatEvent(player, area, positiveDirection));
                 }
 
             } else if (action.equals("REQUEST_DEBUG_PAGE")) {
                 int page = in.readInt();
-                plugin.getDebugManager().sendPage(player, page);
+                String scope = in.available() > 0 ? in.readUTF() : "cube";
+                plugin.getDebugManager().sendPage(player, page, scope);
             }
 
         } catch (IOException e) {
-            plugin.getLogger().severe("Error al recibir mensaje del cliente");
+            plugin.getLogger().severe("Error receiving message from client");
             e.printStackTrace();
         }
     }

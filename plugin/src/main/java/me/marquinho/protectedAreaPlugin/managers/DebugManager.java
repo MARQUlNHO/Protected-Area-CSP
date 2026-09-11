@@ -15,7 +15,7 @@ import java.util.*;
 public class DebugManager {
 
     private final ProtectedAreaPlugin plugin;
-    private final Map<UUID, Integer> activeSessions = new HashMap<>();
+    private final Map<UUID, Session> activeSessions = new HashMap<>();
 
     public static final int PAGE_OVERVIEW   = 0;
     public static final int PAGE_RULES      = 1;
@@ -24,14 +24,25 @@ public class DebugManager {
     public static final int PAGE_ADVANCED   = 4;
     public static final int TOTAL_PAGES     = 5;
 
+    public static final int DIM_PAGE_OVERVIEW   = 0;
+    public static final int DIM_PAGE_RULES      = 1;
+    public static final int DIM_PAGE_EXCEPTIONS = 2;
+    public static final int DIM_PAGE_ADVANCED   = 3;
+    public static final int DIMENSION_TOTAL_PAGES = 4;
+
+    public static final String SCOPE_CUBE      = "cube";
+    public static final String SCOPE_DIMENSION = "dimension";
+
+    private record Session(int page, String scope) {}
+
     public DebugManager(ProtectedAreaPlugin plugin) {
         this.plugin = plugin;
         plugin.getServer().getScheduler().runTaskTimer(plugin, this::refreshActiveSessions, 20L, 20L);
     }
 
     public void enableDebug(Player target) {
-        activeSessions.put(target.getUniqueId(), PAGE_OVERVIEW);
-        sendPage(target, PAGE_OVERVIEW);
+        activeSessions.put(target.getUniqueId(), new Session(PAGE_OVERVIEW, SCOPE_CUBE));
+        sendPage(target, PAGE_OVERVIEW, SCOPE_CUBE);
     }
 
     public void disableDebug(Player target) {
@@ -48,55 +59,94 @@ public class DebugManager {
     }
 
     public void sendPage(Player player, int page) {
+        sendPage(player, page, SCOPE_CUBE);
+    }
+
+    public void sendPage(Player player, int page, String scope) {
         if (!activeSessions.containsKey(player.getUniqueId())) return;
 
-        activeSessions.put(player.getUniqueId(), page);
+        String resolvedScope = SCOPE_DIMENSION.equals(scope) ? SCOPE_DIMENSION : SCOPE_CUBE;
+        activeSessions.put(player.getUniqueId(), new Session(page, resolvedScope));
 
-        ProtectedArea currentArea = plugin.getAreaManager().getAreaAt(player.getLocation());
+        if (SCOPE_DIMENSION.equals(resolvedScope)) {
+            String dimensionKey = player.getWorld().getKey().toString();
+            ProtectedArea area = plugin.getAreaManager().getDimensionArea(dimensionKey);
+            String areaId = area != null ? area.getId() : "";
+            switch (page) {
+                case DIM_PAGE_RULES      -> sendRulesPage(player, area, areaId, resolvedScope, DIMENSION_TOTAL_PAGES, DIM_PAGE_RULES);
+                case DIM_PAGE_EXCEPTIONS -> sendExceptionsPage(player, area, areaId, resolvedScope, DIMENSION_TOTAL_PAGES, DIM_PAGE_EXCEPTIONS);
+                case DIM_PAGE_ADVANCED   -> sendAdvancedPage(player, area, areaId, resolvedScope, DIMENSION_TOTAL_PAGES, DIM_PAGE_ADVANCED);
+                default                  -> sendDimensionOverviewPage(player, area, areaId, dimensionKey);
+            }
+            return;
+        }
+
+        ProtectedArea currentArea = plugin.getAreaManager().getCubeAreaAt(player.getLocation());
         String currentAreaId = currentArea != null ? currentArea.getId() : "";
 
         switch (page) {
-            case PAGE_OVERVIEW   -> sendOverviewPage(player, currentAreaId);
-            case PAGE_RULES      -> sendRulesPage(player, currentArea, currentAreaId);
-            case PAGE_EXCEPTIONS -> sendExceptionsPage(player, currentArea, currentAreaId);
-            case PAGE_LIMIT      -> sendLimitPage(player, currentArea, currentAreaId);
-            case PAGE_ADVANCED   -> sendAdvancedPage(player, currentArea, currentAreaId);
-            default              -> sendOverviewPage(player, currentAreaId);
+            case PAGE_RULES      -> sendRulesPage(player, currentArea, currentAreaId, resolvedScope, TOTAL_PAGES, PAGE_RULES);
+            case PAGE_EXCEPTIONS -> sendExceptionsPage(player, currentArea, currentAreaId, resolvedScope, TOTAL_PAGES, PAGE_EXCEPTIONS);
+            case PAGE_LIMIT      -> sendLimitPage(player, currentArea, currentAreaId, resolvedScope);
+            case PAGE_ADVANCED   -> sendAdvancedPage(player, currentArea, currentAreaId, resolvedScope, TOTAL_PAGES, PAGE_ADVANCED);
+            default              -> sendOverviewPage(player, currentAreaId, resolvedScope);
         }
     }
 
     public void refreshActiveSessions() {
-        for (Map.Entry<UUID, Integer> entry : activeSessions.entrySet()) {
+        for (Map.Entry<UUID, Session> entry : activeSessions.entrySet()) {
             Player player = plugin.getServer().getPlayer(entry.getKey());
             if (player != null && player.isOnline()) {
-                sendPage(player, entry.getValue());
+                sendPage(player, entry.getValue().page(), entry.getValue().scope());
             }
         }
     }
 
-    private void sendOverviewPage(Player player, String currentAreaId) {
+    private DataOutputStream header(ByteArrayOutputStream bos, int page, int totalPages,
+                                    String areaId, String scope) throws IOException {
+        DataOutputStream out = new DataOutputStream(bos);
+        out.writeUTF("DEBUG_DATA");
+        out.writeInt(page);
+        out.writeInt(totalPages);
+        out.writeUTF(areaId);
+        out.writeUTF(scope);
+        return out;
+    }
+
+    private void send(Player player, ByteArrayOutputStream bos) {
+        player.sendPluginMessage(plugin, "protectedarea:main", bos.toByteArray());
+    }
+
+    private void sendOverviewPage(Player player, String currentAreaId, String scope) {
         try {
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            DataOutputStream out = new DataOutputStream(bos);
-            out.writeUTF("DEBUG_DATA");
-            out.writeInt(PAGE_OVERVIEW);
-            out.writeInt(TOTAL_PAGES);
-            out.writeUTF(currentAreaId);
+            DataOutputStream out = header(bos, PAGE_OVERVIEW, TOTAL_PAGES, currentAreaId, scope);
             out.writeInt(plugin.getAreaManager().getAreas().size());
-            player.sendPluginMessage(plugin, "protectedarea:main", bos.toByteArray());
+            send(player, bos);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private void sendRulesPage(Player player, ProtectedArea area, String currentAreaId) {
+    private void sendDimensionOverviewPage(Player player, ProtectedArea area, String areaId, String dimensionKey) {
         try {
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            DataOutputStream out = new DataOutputStream(bos);
-            out.writeUTF("DEBUG_DATA");
-            out.writeInt(PAGE_RULES);
-            out.writeInt(TOTAL_PAGES);
-            out.writeUTF(currentAreaId);
+            DataOutputStream out = header(bos, DIM_PAGE_OVERVIEW, DIMENSION_TOTAL_PAGES, areaId, SCOPE_DIMENSION);
+            out.writeInt(plugin.getAreaManager().countDimensionAreas());
+            out.writeUTF(dimensionKey);
+            out.writeInt(area != null ? area.getPriority() : 0);
+            out.writeUTF(area != null && area.hasSkybox() ? area.getSkybox() : "");
+            send(player, bos);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void sendRulesPage(Player player, ProtectedArea area, String currentAreaId,
+                               String scope, int totalPages, int page) {
+        try {
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            DataOutputStream out = header(bos, page, totalPages, currentAreaId, scope);
 
             if (area == null) {
                 out.writeInt(0);
@@ -109,20 +159,17 @@ public class DebugManager {
                 }
             }
 
-            player.sendPluginMessage(plugin, "protectedarea:main", bos.toByteArray());
+            send(player, bos);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private void sendExceptionsPage(Player player, ProtectedArea area, String currentAreaId) {
+    private void sendExceptionsPage(Player player, ProtectedArea area, String currentAreaId,
+                                    String scope, int totalPages, int page) {
         try {
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            DataOutputStream out = new DataOutputStream(bos);
-            out.writeUTF("DEBUG_DATA");
-            out.writeInt(PAGE_EXCEPTIONS);
-            out.writeInt(TOTAL_PAGES);
-            out.writeUTF(currentAreaId);
+            DataOutputStream out = header(bos, page, totalPages, currentAreaId, scope);
 
             if (area == null) {
                 out.writeInt(0);
@@ -138,20 +185,16 @@ public class DebugManager {
                 }
             }
 
-            player.sendPluginMessage(plugin, "protectedarea:main", bos.toByteArray());
+            send(player, bos);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private void sendLimitPage(Player player, ProtectedArea area, String currentAreaId) {
+    private void sendLimitPage(Player player, ProtectedArea area, String currentAreaId, String scope) {
         try {
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            DataOutputStream out = new DataOutputStream(bos);
-            out.writeUTF("DEBUG_DATA");
-            out.writeInt(PAGE_LIMIT);
-            out.writeInt(TOTAL_PAGES);
-            out.writeUTF(currentAreaId);
+            DataOutputStream out = header(bos, PAGE_LIMIT, TOTAL_PAGES, currentAreaId, scope);
 
             boolean hasLimit = area != null && area.hasPlayerLimit();
             out.writeBoolean(hasLimit);
@@ -164,25 +207,22 @@ public class DebugManager {
                 out.writeBoolean(area.hasException(player.getName(), "limit"));
             }
 
-            player.sendPluginMessage(plugin, "protectedarea:main", bos.toByteArray());
+            send(player, bos);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private void sendAdvancedPage(Player player, ProtectedArea area, String currentAreaId) {
+    private void sendAdvancedPage(Player player, ProtectedArea area, String currentAreaId,
+                                  String scope, int totalPages, int page) {
         try {
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            DataOutputStream out = new DataOutputStream(bos);
-            out.writeUTF("DEBUG_DATA");
-            out.writeInt(PAGE_ADVANCED);
-            out.writeInt(TOTAL_PAGES);
-            out.writeUTF(currentAreaId);
+            DataOutputStream out = header(bos, page, totalPages, currentAreaId, scope);
 
             if (area == null) {
                 out.writeInt(0);
             } else {
-                AdvancedAreaRules advancedRules = plugin.getAdvancedRulesManager().getRules(area.getId());
+                AdvancedAreaRules advancedRules = plugin.getAdvancedRulesManager().getRules(area.getStorageKey());
                 List<String[]> entries = new ArrayList<>();
 
                 for (AdvancedRuleType ruleType : AdvancedRuleType.values()) {
@@ -202,7 +242,7 @@ public class DebugManager {
                 }
             }
 
-            player.sendPluginMessage(plugin, "protectedarea:main", bos.toByteArray());
+            send(player, bos);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -213,7 +253,7 @@ public class DebugManager {
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
             DataOutputStream out = new DataOutputStream(bos);
             out.writeUTF("DEBUG_CLOSE");
-            player.sendPluginMessage(plugin, "protectedarea:main", bos.toByteArray());
+            send(player, bos);
         } catch (IOException e) {
             e.printStackTrace();
         }

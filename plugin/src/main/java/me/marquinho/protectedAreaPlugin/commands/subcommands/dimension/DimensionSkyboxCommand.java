@@ -1,9 +1,8 @@
-package me.marquinho.protectedAreaPlugin.commands.subcommands.cube;
+package me.marquinho.protectedAreaPlugin.commands.subcommands.dimension;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
-import com.mojang.brigadier.suggestion.SuggestionProvider;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 import me.marquinho.protectedAreaPlugin.ProtectedAreaPlugin;
@@ -12,13 +11,13 @@ import org.bukkit.command.CommandSender;
 
 import java.util.List;
 
-public class SkyboxCommand {
+public class DimensionSkyboxCommand {
 
     public static LiteralArgumentBuilder<CommandSourceStack> buildCommand(ProtectedAreaPlugin plugin) {
         return Commands.literal("skybox")
                 .then(Commands.literal("add")
                         .then(Commands.argument("area_id", StringArgumentType.string())
-                                .suggests(suggestAreaIds(plugin))
+                                .suggests(DimensionAreas.suggestIds(plugin))
                                 .then(Commands.argument("skybox_name", StringArgumentType.word())
                                         .executes(context -> executeAdd(context, plugin))
                                 )
@@ -26,13 +25,13 @@ public class SkyboxCommand {
                 )
                 .then(Commands.literal("remove")
                         .then(Commands.argument("area_id", StringArgumentType.string())
-                                .suggests(suggestAreaIdsWithSkybox(plugin))
+                                .suggests(DimensionAreas.suggestIdsWithSkybox(plugin))
                                 .executes(context -> executeRemove(context, plugin))
                         )
                 )
                 .then(Commands.literal("info")
                         .then(Commands.argument("area_id", StringArgumentType.string())
-                                .suggests(suggestAreaIds(plugin))
+                                .suggests(DimensionAreas.suggestIds(plugin))
                                 .executes(context -> executeInfo(context, plugin))
                         )
                 );
@@ -43,19 +42,21 @@ public class SkyboxCommand {
         String areaId = StringArgumentType.getString(context, "area_id");
         String skyboxName = StringArgumentType.getString(context, "skybox_name");
 
-        if (areaId.endsWith("/")) {
-            List<ProtectedArea> list = plugin.getAreaManager().getAreasByFolder(areaId);
-            if (list.isEmpty()) { sender.sendMessage("§cNo areas in folder: " + areaId); return 0; }
+        if (DimensionAreas.isFolder(areaId)) {
+            List<ProtectedArea> areaList = DimensionAreas.resolveFolder(sender, plugin, areaId);
+            if (areaList == null) return 0;
             int count = 0;
-            for (ProtectedArea a : list) if (plugin.getAreaManager().setSkyboxForArea(a.getId(), skyboxName)) count++;
+            for (ProtectedArea a : areaList) if (plugin.getAreaManager().setSkyboxForArea(a.getId(), skyboxName)) count++;
+            plugin.getAreaManager().broadcastDimensionSkyboxes();
             sender.sendMessage("§aSkybox §6" + skyboxName + " §aapplied to §6" + count + " §aarea(s) in §6" + areaId);
             return 1;
         }
 
-        ProtectedArea area = plugin.getAreaManager().getAreas().get(areaId);
-        if (area == null) { sender.sendMessage("§cNo area exists with ID: " + areaId); return 0; }
+        ProtectedArea area = DimensionAreas.resolve(sender, plugin, areaId);
+        if (area == null) return 0;
 
         if (plugin.getAreaManager().setSkyboxForArea(areaId, skyboxName)) {
+            plugin.getAreaManager().broadcastDimensionSkyboxes();
             sender.sendMessage("§aSkybox assigned successfully!");
             sender.sendMessage("§eArea: §6" + areaId);
             sender.sendMessage("§eSkybox: §6" + skyboxName);
@@ -71,21 +72,27 @@ public class SkyboxCommand {
         CommandSender sender = context.getSource().getSender();
         String areaId = StringArgumentType.getString(context, "area_id");
 
-        if (areaId.endsWith("/")) {
-            List<ProtectedArea> list = plugin.getAreaManager().getAreasByFolder(areaId);
-            if (list.isEmpty()) { sender.sendMessage("§cNo areas in folder: " + areaId); return 0; }
+        if (DimensionAreas.isFolder(areaId)) {
+            List<ProtectedArea> areaList = DimensionAreas.resolveFolder(sender, plugin, areaId);
+            if (areaList == null) return 0;
             int count = 0;
-            for (ProtectedArea a : list) if (a.hasSkybox() && plugin.getAreaManager().setSkyboxForArea(a.getId(), "")) count++;
+            for (ProtectedArea a : areaList) if (a.hasSkybox() && plugin.getAreaManager().setSkyboxForArea(a.getId(), "")) count++;
+            plugin.getAreaManager().broadcastDimensionSkyboxes();
             sender.sendMessage("§aSkybox removed from §6" + count + " §aarea(s) in §6" + areaId);
             return 1;
         }
 
-        ProtectedArea area = plugin.getAreaManager().getAreas().get(areaId);
-        if (area == null) { sender.sendMessage("§cNo area exists with ID: " + areaId); return 0; }
-        if (!area.hasSkybox()) { sender.sendMessage("§eThe area §6" + areaId + " §ehas no skybox assigned"); return 0; }
+        ProtectedArea area = DimensionAreas.resolve(sender, plugin, areaId);
+        if (area == null) return 0;
+
+        if (!area.hasSkybox()) {
+            sender.sendMessage("§eThe area §6" + areaId + " §ehas no skybox assigned");
+            return 0;
+        }
 
         String previous = area.getSkybox();
         if (plugin.getAreaManager().setSkyboxForArea(areaId, "")) {
+            plugin.getAreaManager().broadcastDimensionSkyboxes();
             sender.sendMessage("§aSkybox removed from the area!");
             sender.sendMessage("§eArea: §6" + areaId);
             sender.sendMessage("§7Previous skybox: §f" + previous);
@@ -100,11 +107,11 @@ public class SkyboxCommand {
         CommandSender sender = context.getSource().getSender();
         String areaId = StringArgumentType.getString(context, "area_id");
 
-        ProtectedArea area = plugin.getAreaManager().getAreas().get(areaId);
-        if (area == null) { sender.sendMessage("§cNo area exists with ID: " + areaId); return 0; }
+        ProtectedArea area = DimensionAreas.resolve(sender, plugin, areaId);
+        if (area == null) return 0;
 
         sender.sendMessage("§e§m                                          ");
-        sender.sendMessage("§6§lArea Skybox - §e" + areaId);
+        sender.sendMessage("§6§lArea Skybox: §e" + areaId);
         sender.sendMessage("");
         if (area.hasSkybox()) {
             sender.sendMessage("  §aSkybox: §6" + area.getSkybox());
@@ -115,27 +122,5 @@ public class SkyboxCommand {
         sender.sendMessage("");
         sender.sendMessage("§e§m                                          ");
         return 1;
-    }
-
-    private static SuggestionProvider<CommandSourceStack> suggestAreaIds(ProtectedAreaPlugin plugin) {
-        return (context, builder) -> {
-            plugin.getAreaManager().getAreas().entrySet().stream()
-                    .filter(e -> e.getValue().isCube())
-                    .filter(e -> !plugin.getConfigManager().isIgnoredInCommand(e.getValue()))
-                    .map(java.util.Map.Entry::getKey)
-                    .forEach(id -> builder.suggest(id.contains("/") ? "\"" + id + "\"" : id));
-            return builder.buildFuture();
-        };
-    }
-
-    private static SuggestionProvider<CommandSourceStack> suggestAreaIdsWithSkybox(ProtectedAreaPlugin plugin) {
-        return (context, builder) -> {
-            plugin.getAreaManager().getAreas().entrySet().stream()
-                    .filter(e -> e.getValue().isCube() && e.getValue().hasSkybox())
-                    .filter(e -> !plugin.getConfigManager().isIgnoredInCommand(e.getValue()))
-                    .map(java.util.Map.Entry::getKey)
-                    .forEach(id -> builder.suggest(id.contains("/") ? "\"" + id + "\"" : id));
-            return builder.buildFuture();
-        };
     }
 }

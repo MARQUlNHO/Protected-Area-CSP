@@ -1,24 +1,55 @@
 package me.marquinho.protectedAreaPlugin.models;
 
-public enum AdvancedRuleType {
-    YES_BREAK("yes_break", "Permitir romper bloques específicos"),
-    YES_PLACE("yes_place", "Permitir colocar bloques específicos"),
-    YES_INTERACT("yes_interact", "Permitir interactuar con bloques/entidades específicos"),
-    YES_DROP("yes_drop", "Permitir tirar items específicos"),
-    YES_COLLECT("yes_collect", "Permitir recoger items específicos"),
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.Set;
 
-    NO_BREAK("no_break", "Bloquear romper bloques específicos"),
-    NO_PLACE("no_place", "Bloquear colocar bloques específicos"),
-    NO_INTERACT("no_interact", "Bloquear interactuar con bloques/entidades específicos"),
-    NO_DROP("no_drop", "Bloquear tirar items específicos"),
-    NO_COLLECT("no_collect", "Bloquear recoger items específicos");
+public enum AdvancedRuleType {
+    YES_BREAK("yes_break", "Allow breaking specific blocks", Target.BLOCK),
+    YES_PLACE("yes_place", "Allow placing specific blocks", Target.BLOCK),
+    YES_INTERACT("yes_interact", "Allow interacting with specific blocks/entities", Target.BLOCK, Target.ENTITY),
+    YES_DROP("yes_drop", "Allow dropping specific items", Target.ITEM),
+    YES_COLLECT("yes_collect", "Allow collecting specific items", Target.ITEM),
+
+    NO_BREAK("no_break", "Block breaking specific blocks", Target.BLOCK),
+    NO_PLACE("no_place", "Block placing specific blocks", Target.BLOCK),
+    NO_INTERACT("no_interact", "Block interacting with specific blocks/entities", Target.BLOCK, Target.ENTITY),
+    NO_DROP("no_drop", "Block dropping specific items", Target.ITEM),
+    NO_COLLECT("no_collect", "Block collecting specific items", Target.ITEM);
+
+    public enum Target {
+        BLOCK("block", "Block"),
+        ENTITY("entity", "Entity"),
+        ITEM("item", "Item");
+
+        private final String key;
+        private final String displayName;
+
+        Target(String key, String displayName) {
+            this.key = key;
+            this.displayName = displayName;
+        }
+
+        public String getKey() {
+            return key;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
+    }
 
     private final String key;
     private final String description;
+    private final Set<Target> targets;
 
-    AdvancedRuleType(String key, String description) {
+    AdvancedRuleType(String key, String description, Target... targets) {
         this.key = key;
         this.description = description;
+
+        Set<Target> set = EnumSet.noneOf(Target.class);
+        Collections.addAll(set, targets);
+        this.targets = Collections.unmodifiableSet(set);
     }
 
     public String getKey() {
@@ -27,6 +58,14 @@ public enum AdvancedRuleType {
 
     public String getDescription() {
         return description;
+    }
+
+    public Set<Target> getTargets() {
+        return targets;
+    }
+
+    public boolean supports(Target target) {
+        return targets.contains(target);
     }
 
     public boolean isYesRule() {

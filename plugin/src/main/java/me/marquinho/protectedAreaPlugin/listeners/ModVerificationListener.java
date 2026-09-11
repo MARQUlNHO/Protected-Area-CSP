@@ -53,7 +53,7 @@ public class ModVerificationListener implements Listener {
             out.writeUTF("MOD_CHECK");
             player.sendPluginMessage(plugin, "protectedarea:main", stream.toByteArray());
 
-            plugin.getLogger().info("Enviando verificación de mod a: " + player.getName());
+            plugin.getLogger().info("Sending mod verification to: " + player.getName());
         } catch (IOException e) {
 //            plugin.getLogger().severe("Error al enviar paquete de verificación a: " + player.getName());
             e.printStackTrace();
@@ -72,7 +72,7 @@ public class ModVerificationListener implements Listener {
             String kickMessage = plugin.getConfigManager().getKickMessage();
             player.kickPlayer(kickMessage);
 
-            plugin.getLogger().warning("Jugador " + player.getName() + " expulsado por no tener el mod de cliente");
+            plugin.getLogger().warning("Player " + player.getName() + " kicked for not having the client mod");
         }
 
         cleanup(player.getUniqueId());
