@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "protectedarea",
+  "provides": [
+    "protectedareaserver",
+    "protectedareaclient"
+  ],
+  "version": "${version}",
+  "name": "ProtectedArea",
+  "description": "Desarrollado por ZIO",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/protectedarea/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "client": [
+      "me.marquinho.protectedarea.client.ProtectedareaClient"
+    ],
+    "main": [
+      "me.marquinho.protectedarea.Protectedarea"
+    ]
+  },
+  "mixins": [
+    "protectedarea.mixins.json",
+    {
+      "config": "protectedarea.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": ">=${minecraft_version}"
+  }
+}

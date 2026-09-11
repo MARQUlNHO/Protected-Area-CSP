@@ -1,0 +1,19 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "me.marquinho.protectedarea.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "BlockPlaceMixin",
+    "ExplosionMixin",
+    "ItemDropMixin",
+    "ItemEntityMixin",
+    "MobSpawnMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}
